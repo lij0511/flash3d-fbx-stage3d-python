@@ -1,62 +1,76 @@
-<<<<<<< HEAD
-环境需求: 
-	1、Python2.7 
-	2、Fbxsdk2015.1 
+FbxParser
+=========
 
-下载地址: 
-	1、Python下载地址:https://www.python.org/downloads/ 
-	2、Fbxsdk Python Binding 下载地址:http://usa.autodesk.com/adsk/servlet/pc/item?siteID=123112&id=10775847
+Runtime Requirements
+------------------
+* Python2.7
+* Fbxsdk 2015.1
 
-windows环境配置: 
-	1、安装python2.7并配置好环境、环境变量配置方式参照:http://jingyan.baidu.com/article/48206aeafdcf2a216ad6b316.html 2、安装Fbxsdk2015 
-	3、将Fbxsdk2015 安装目录\FBX Python SDK\2015.1\lib\Python27_x86\ 下所有的文件拷贝到python 安装目录\Lib\site-packages\ 目录
+运行环境
+------------------
+* Python2.7
+* Fbxsdk 2015.1
 
-Mac环境配置: 
-	1、安装python2.7
-	2、安装fbxsdk2015 
-	3、将/Applications/Autodesk/FBX Python SDK/2015.1/lib/Python27路径下的所有文件拷贝至/Library/Python/2.7/site-packages目录
+Downloads
+------------------
+* Python2.7		https://www.python.org/downloads/ 
+* Fbxsdk 2015.1		http://usa.autodesk.com/adsk/servlet/pc/item?siteID=123112&id=10775847
 
-Linux环境配置: 
-=======
-环境需求:
-	1、Python2.7
-	2、Fbxsdk2015.1
-下载地址:
-	1、Python下载地址:https://www.python.org/downloads/
-	2、Fbxsdk Python Binding 下载地址:http://usa.autodesk.com/adsk/servlet/pc/item?siteID=123112&id=10775847
+下载地址
+------------------
+* Python2.7		https://www.python.org/downloads/ 
+* Fbxsdk 2015.1		http://usa.autodesk.com/adsk/servlet/pc/item?siteID=123112&id=10775847
 
-windows环境配置:
-	1、安装python2.7并配置好环境、环境变量配置方式参照:http://jingyan.baidu.com/article/48206aeafdcf2a216ad6b316.html
-	2、安装Fbxsdk2015
-	3、将Fbxsdk2015 安装目录\FBX Python SDK\2015.1\lib\Python27_x86\ 下所有的文件拷贝到python 安装目录\Lib\site-packages\ 目录
+To install Python FBX:
+------------------
+* Copy the contents of <yourFBXSDKpath>\lib\<Pythonxxxxxx>\ into:
+* Windows: yourPythonPath\Lib\site-packages\
+* Mac OSX: /Library/Python/x.x/site-packages/
+* Linux  : /usr/local/lib/pythonx.x/site-packages/
 
-Mac环境配置:
-	1、安装python2.7  
-	2、安装fbxsdk2015
-	3、将/Applications/Autodesk/FBX Python SDK/2015.1/lib/Python27路径下的所有文件拷贝至/Library/Python/2.7/site-packages目录
+如何安装 Python FBX:
+------------------
+* 拷贝 <Fbxsdk安装目录>\lib\<Pythonxxxxxx>\ into:
+* Windows: Python安装目录\Lib\site-packages\
+* Mac OSX: /Library/Python/x.x/site-packages/
+* Linux  : /usr/local/lib/pythonx.x/site-packages/
 
-Linux环境配置:
->>>>>>> FETCH_HEAD
-	1、参照:http://docs.autodesk.com/FBX/2014/ENU/FBX-SDK-Documentation/index.html?url=cpp_ref/fbxtypes_8h.html,topicNumber=cpp_ref_fbxtypes_8h_html7cba7c66-9e54-43f8-a60c-f6986ac1c59d,hash=a171e72a1c46fc15c1a6c9c31948c1c5b
+How to Use
+----------
+   * put FbxParser.py and Fbxfile together
+   * Windos: Double click FbxParser.py
+   * Mac   : open terminal. locate to fbxfile directory. run->python FbxParser.py
 
-脚本快速使用方法: 
-	1、将脚本与fbx文件放置于同一目录
-	2、运行
-    windows:
-        双击脚本即可
-    mac:
-        进入terminal、定位到脚本目录、输入:python FbxParser.py
-
-注意事项: 
-	fbx文件名，fbx文件路径，建模过程中不要使用中文。
-
-通过命令参数方式使用该脚本: 
-	-noaml 解析法线 
-	-uv0 解析UV0 
-	-uv1 解析UV1 
-	-anim 解析动画 
-	-world 使用全局坐标 
-	-path 指定Fbx文件路径
-
+使用
+----------
+   * 将 FbxParser.py与Fbx文件放置到一起
+   * Windos: 双击FbxParser.py
+   * Mac   : 定位到Fbx文件目录,运行:python FbxParser.py
+   
+Option
+----------
+   * -normal:parse normals
+   * -uv0   :parse uv0
+   * -uv1   :parse uv1
+   * -anim  :parse animation
+   * -world :parse use global transform
+   * -path  :assign fbxfile
+   
+脚本参数
+----------
+   * -normal:解析法线
+   * -uv0   :解析uv0
+   * -uv1   :解析uv1
+   * -anim  :解析动画
+   * -world :使用全局空间
+   * -path  :指定fbx文件
+   
+其它
+----------
+   * Fbx文件名、Fbx文件路径、模型、贴图以及其它均不能使用中文
+   
 Updating: 
-	脚本目前只能解析静态模型以及动画。不能解析相机、灯光、骨骼动画等等。脚本目前的所有参数无法使用，默认解析所有数据。
+----------
+   * 脚本目前只能解析静态模型以及动画。不能解析相机、灯光、骨骼动画等等。脚本目前的所有参数无法使用，默认解析所有数据。
+
+	
