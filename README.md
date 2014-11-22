@@ -1,8 +1,8 @@
 环境需求:
 	python2.7 FbxSdk2015.1
 
-python下载对应平台的2.7版本 		下载地址:https://www.python.org/downloads/
-FbxSdk下载对应平台的Python Binding 下载地址:http://usa.autodesk.com/adsk/servlet/pc/item?siteID=123112&id=10775847
+Python下载地址:https://www.python.org/downloads/
+Fbxsdk Python Binding 下载地址:http://usa.autodesk.com/adsk/servlet/pc/item?siteID=123112&id=10775847
 
 windows环境配置:
 	安装python2.7并配置好环境、环境变量配置方式参照:http://jingyan.baidu.com/article/48206aeafdcf2a216ad6b316.html
