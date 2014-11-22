@@ -1,21 +1,22 @@
 环境需求:
-	python2.7 FbxSdk2015.1
-
-Python下载地址:https://www.python.org/downloads/
-Fbxsdk Python Binding 下载地址:http://usa.autodesk.com/adsk/servlet/pc/item?siteID=123112&id=10775847
+	1、Python2.7
+	2、Fbxsdk2015.1
+下载地址:
+	1、Python下载地址:https://www.python.org/downloads/
+	2、Fbxsdk Python Binding 下载地址:http://usa.autodesk.com/adsk/servlet/pc/item?siteID=123112&id=10775847
 
 windows环境配置:
-	安装python2.7并配置好环境、环境变量配置方式参照:http://jingyan.baidu.com/article/48206aeafdcf2a216ad6b316.html
-	安装Fbxsdk2015
-	将Fbxsdk2015 安装目录\FBX Python SDK\2015.1\lib\Python27_x86\ 下所有的文件拷贝到python 安装目录\Lib\site-packages\ 目录
+	1、安装python2.7并配置好环境、环境变量配置方式参照:http://jingyan.baidu.com/article/48206aeafdcf2a216ad6b316.html
+	2、安装Fbxsdk2015
+	3、将Fbxsdk2015 安装目录\FBX Python SDK\2015.1\lib\Python27_x86\ 下所有的文件拷贝到python 安装目录\Lib\site-packages\ 目录
 
 Mac环境配置:
-	安装python2.7  
-	安装fbxsdk2015
-	将/Applications/Autodesk/FBX Python SDK/2015.1/lib/Python27路径下的所有文件拷贝至/Library/Python/2.7/site-packages目录
+	1、安装python2.7  
+	2、安装fbxsdk2015
+	3、将/Applications/Autodesk/FBX Python SDK/2015.1/lib/Python27路径下的所有文件拷贝至/Library/Python/2.7/site-packages目录
 
 Linux环境配置:
-	参照:http://docs.autodesk.com/FBX/2014/ENU/FBX-SDK-Documentation/index.html?url=cpp_ref/fbxtypes_8h.html,topicNumber=cpp_ref_fbxtypes_8h_html7cba7c66-9e54-43f8-a60c-f6986ac1c59d,hash=a171e72a1c46fc15c1a6c9c31948c1c5b
+	1、参照:http://docs.autodesk.com/FBX/2014/ENU/FBX-SDK-Documentation/index.html?url=cpp_ref/fbxtypes_8h.html,topicNumber=cpp_ref_fbxtypes_8h_html7cba7c66-9e54-43f8-a60c-f6986ac1c59d,hash=a171e72a1c46fc15c1a6c9c31948c1c5b
 
 脚本快速使用方法:
 	1、将脚本与fbx文件放置于同一目录
