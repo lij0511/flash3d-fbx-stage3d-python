@@ -23,29 +23,29 @@ Downloads
 
 To install Python FBX:
 ------------------
-* Copy the contents of <yourFBXSDKpath>\lib\<Pythonxxxxxx>\ into:
+* Copy the contents of yourFBXSDKpath\lib\<Pythonxxxxxx>\ into:
 * Windows: yourPythonPath\Lib\site-packages\
 * Mac OSX: /Library/Python/x.x/site-packages/
 * Linux  : /usr/local/lib/pythonx.x/site-packages/
 
 如何安装 Python FBX:
 ------------------
-* 拷贝 <Fbxsdk安装目录>\lib\<Pythonxxxxxx>\ into:
+* 拷贝 Fbxsdk安装目录\lib\<Pythonxxxxxx>\ into:
 * Windows: Python安装目录\Lib\site-packages\
 * Mac OSX: /Library/Python/x.x/site-packages/
 * Linux  : /usr/local/lib/pythonx.x/site-packages/
 
 How to Use
 ----------
-   * put FbxParser.py and Fbxfile together
+   * put FbxParser.py and fbx file together
    * Windos: Double click FbxParser.py
-   * Mac   : open terminal. locate to fbxfile directory. run->python FbxParser.py
+   * Mac   : open terminal. locate to fbx file directory. run:python FbxParser.py
 
 使用
 ----------
-   * 将 FbxParser.py与Fbx文件放置到一起
+   * 将 FbxParser.py与fbx文件放置到一起
    * Windos: 双击FbxParser.py
-   * Mac   : 定位到Fbx文件目录,运行:python FbxParser.py
+   * Mac   : 定位到fbx文件目录,运行:python FbxParser.py
    
 Option
 ----------
