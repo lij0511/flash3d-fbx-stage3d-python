@@ -26,12 +26,13 @@ class LObject(object):
     pass # end class
 
 # 文件类型
-MESH_TYPE = ".mesh"
-ANIM_TYPE = ".anim"
+MESH_TYPE   = ".mesh"
+ANIM_TYPE   = ".anim"
+CAMERA_TYPE = ".camera"
+
 # 坐标轴，对轴进行180°旋转，对X轴进行Flip操作。因此需要重构索引。
-AXIS_FLIP_X    = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(0, 180, 0), FbxVector4(-1, 1, 1))
-# 坐标轴，未进行flip操作
-AXIS_NO_FLIP_X = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(0, 180, 0), FbxVector4(1, 1, 1))
+AXIS_FLIP_X = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(0, 180, 0), FbxVector4(-1, 1, 1))
+AXIS_NO_FLIP= FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(0, 180, 0), FbxVector4( 1, 1, 1))
 
 # 配置文件
 config = LObject()
@@ -188,23 +189,156 @@ class Camera3D(object):
     """docstring for Camera3D"""
     def __init__(self):
         super(Camera3D, self).__init__()
-        self.fbxCamera       = None
-        self.globalTransform = None
-        self.localTransform  = None
+        self.fbxCamera          = None  # 相机
+        self.scene              = None  # scene
+        self.sdkManager         = None  # sdkMangaer
+        self.fbxFilePath        = None  # filepath
+        self.globalTransform    = None  # global空间
+        self.localTransform     = None  # local 空间
+        self.axisTransform      = None  # 转换空间
+        self.near               = 0     # near
+        self.far                = 3000  # far
+        self.fieldOfView        = 1     # fieldofview
+        self.aspectWidth        = 0
+        self.aspectHeight       = 0
+        self.anim               = []    # 动画
+        self.fileName           = None  # 相机文件路径
+        self.bytes              = None  # 相机数据
+        pass # end func
+    
+    # 解析相机属性
+    def parseCameraProperties(self):
+        self.aspectWidth = self.fbxCamera.AspectWidth.Get()
+        self.aspectHeight= self.fbxCamera.AspectHeight.Get()
+        self.near        = self.fbxCamera.NearPlane.Get()
+        self.far         = self.fbxCamera.FarPlane.Get()
+        self.fieldOfView = self.fbxCamera.FieldOfView.Get()
+        
+        print("\tAspect Width: %f" % self.aspectWidth)
+        print("\tAspect Height:%f" % self.aspectHeight)
+        print("\tNear         :%f" % self.near)
+        print("\tFar          :%f" % self.far)
+        print("\tFieldOfView  :%f" % self.fieldOfView)
+        
         pass # end func
     
     # 解析相机矩阵
     def parseTransform(self):
+        print("\tparse camera transform...")
+        self.localTransform     = self.fbxCamera.GetNode().EvaluateLocalTransform()
+        self.invLocalTransform  = self.localTransform.Inverse()
+        
+        self.globalTransform    = self.fbxCamera.GetNode().EvaluateGlobalTransform()
+        self.invGlobalTransform = self.globalTransform.Inverse()
+        
+        printFBXAMatrix("\tLocal  Matrix:", self.localTransform)
+        printFBXAMatrix("\tGlobal Matrix:", self.globalTransform)
+        
+        # 坐标系矩阵
+        if config.world:
+            self.axisTransform = AXIS_FLIP_X * self.globalTransform  # 使用全局坐标系
+            pass
+        else:
+            self.axisTransform = AXIS_FLIP_X * self.localTransform  # 使用本地坐标系
+            pass
+        self.invAxisTransform = self.axisTransform.Inverse()
+        
+        pass # end func
+    
+    # 解析相机动画
+    def parseCameraAnim(self):
+        fps = FbxTime.GetFrameRate(self.scene.GetGlobalSettings().GetTimeMode())
+        print("\tfps:%d" % (fps))
+        timeSpan  = self.scene.GetSrcObject(FbxAnimStack.ClassId, 0).GetLocalTimeSpan()
+        totalTime = timeSpan.GetStop().Get() - timeSpan.GetStart().Get()
+        time = FbxTime()
+        timeStep = 1.0 / fps
+        time.SetSecondDouble(timeStep)
+        frameCount = totalTime / time.Get()
+        print("\ttotal frames:%d" % frameCount)
+        # 解析每一帧数据
+        for frame in range(frameCount):
+            time.SetSecondDouble(frame * timeStep)
+            animMt = AXIS_NO_FLIP * self.fbxCamera.GetNode().EvaluateGlobalTransform(time)
+            matrix = Matrix3D(animMt)
+            clip   = []
+            # 丢弃最后一列数据
+            for i in range(3):
+                raw = matrix.getRaw(i)
+                for j in range(len(raw)):
+                    clip.append(raw[j])
+                    pass
+                pass # end for
+            self.anim.append(clip)
+        pass # end func
+    
+    # 生成相机数据
+    def generateBytes(self):
+        # 生成Mesh对应的文件名称
+        tokens  = re.compile("[\\\/]").split(self.fbxFilePath)
+        fbxName = tokens[-1]
+        fbxName = fbxName.split(".")[0:-1]
+        fbxName = ".".join(fbxName)
+        fbxDir  = parseFilepath(self.fbxFilePath)
+        self.fileName = fbxDir + fbxName + "_" + self.name + CAMERA_TYPE
+        # 数据
+        self.bytes = b''
+        size = len(str(self.name))
+        self.bytes += struct.pack('<i', size)                   # 名称长度
+        self.bytes += str(self.name)                            # 名称
+        self.bytes += struct.pack('<f', self.aspectWidth)       # 宽度
+        self.bytes += struct.pack('<f', self.aspectHeight)      # 高度
+        self.bytes += struct.pack('<f', self.near)              # near
+        self.bytes += struct.pack('<f', self.far)               # far
+        self.bytes += struct.pack('<f', self.fieldOfView)       # fieldOfView
+        # 保存相机当前位置
+        matrix = AXIS_NO_FLIP * self.fbxCamera.GetNode().EvaluateGlobalTransform()
+        matrix = Matrix3D(matrix)
+        # 丢弃最后一列数据
+        for i in range(3):
+            raw = matrix.getRaw(i)
+            for j in range(len(raw)):
+                self.bytes += struct.pack('<f', raw[j])
+                pass
+            pass
+        # 保存相机动画
+        size = len(self.anim)
+        self.bytes += struct.pack('<i', size)                    # 动画长度
+        # 写动画数据
+        for i in range(size):
+            clip = self.anim[i]
+            for j in range(len(clip)):
+                self.bytes += struct.pack('<f', clip[j])
+                pass
+            pass # end func
+        
+        # 压缩数据
+        self.bytes = zlib.compress(self.bytes, 9)
         
         pass # end func
     
     # 通过FBXCamera初始化相机
-    def initWithFbxCamera(self, fbxCamera):
+    def initWithFbxCamera(self, fbxCamera, sdkManager, scene, filepath):
         print("parse camera...")
-        self.fbxCamera = fbxCamera
+        self.fbxCamera   = fbxCamera
+        self.sdkManager  = sdkManager
+        self.scene       = scene
+        self.fbxFilePath = filepath
         # 相机名称
-        self.name = fbxCamera.GetName()
+        self.name = str(fbxCamera.GetName())
+        print("\t%s" % self.name)
         # 相机的角度以及方位
+        self.parseTransform()
+        # 解析相机属性
+        self.parseCameraProperties()
+        # 解析相机动画
+        if config.anim:
+            self.parseCameraAnim()
+            pass
+        # 生成数据
+        self.generateBytes()
+        # 写相机文件
+        open(self.fileName, 'w+b').write(self.bytes)
         
         pass # end func
 
@@ -442,7 +576,6 @@ class Mesh(object):
     
     # 解析帧动画
     def parseFrameAnim(self, time):
-        # 转换模型到原始状态
         # 顶点 * axis * axis的逆矩阵 * global * axis
         animMt = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
         matrix = Matrix3D(animMt)
@@ -589,7 +722,7 @@ class Mesh(object):
         self.fbxMesh    = fbxMesh
         self.sdkManager = sdkManager
         self.scene      = scene
-        self.name       = fbxMesh.GetNode().GetName()
+        self.name       = str(fbxMesh.GetNode().GetName())
         self.fbxFilePath= fbxFilePath
         print("\t%s" % (self.name))
         # 解析矩阵
@@ -612,14 +745,14 @@ class Mesh(object):
             self.parseAnim()
         # 生成模型数据
         self.generateMeshBytes()
-        self.generateAnimBytes()
         # 生成动画数据
+        self.generateAnimBytes()
         
         open(self.meshFileName, 'w+b').write(self.meshBytes)
         open(self.animFileName, 'w+b').write(self.animBytes)
         
         pass
-
+        
 
 
     pass # end class
@@ -633,7 +766,7 @@ def parseCameras(sdkManager, scene, filepath):
     for i in range(count):
         fbxCamera = scene.GetSrcObject(FbxCamera.ClassId, i)
         camera = Camera3D()
-        camera.initWithFbxCamera(fbxCamera)
+        camera.initWithFbxCamera(fbxCamera, sdkManager, scene, filepath)
         cameras.append(camera)
         pass # end for
     return cameras
@@ -682,8 +815,8 @@ if __name__ == "__main__":
     
     # 解析参数
     config = parseArgument()
-#     fbxList = scanFbxFiles(config.path)
-    fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/Test2.FBX"]
+    fbxList = scanFbxFiles(config.path)
+#     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/Test2.FBX"]
     for item in fbxList:
         parseFBX(item, config)
         pass

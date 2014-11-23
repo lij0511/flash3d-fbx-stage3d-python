@@ -8,7 +8,7 @@ package {
 	import flash.geom.Vector3D;
 	import flash.utils.ByteArray;
 	import flash.utils.Endian;
-	  
+	
 	import flare.basic.Scene3D;
 	import flare.basic.Viewer3D;
 	import flare.core.Frame3D;
@@ -21,10 +21,14 @@ package {
 	
 	public class FbxParser extends Sprite {  
 		
-		[Embed(source="teapot_Teapot001.mesh", mimeType="application/octet-stream")]
+//		[Embed(source="teapot_Teapot001.mesh", mimeType="application/octet-stream")]
+		[Embed(source="Test2_Box002.mesh", mimeType="application/octet-stream")]
 		private var MeshData : Class;  
-		[Embed(source="teapot_Teapot001.anim", mimeType="application/octet-stream")]
+//		[Embed(source="teapot_Teapot001.anim", mimeType="application/octet-stream")]
+		[Embed(source="Test2_Box002.anim", mimeType="application/octet-stream")]
 		private var AnimData : Class;
+		[Embed(source="Test2_.camera", mimeType="application/octet-stream")]
+		private var CameraData : Class;
 		
 		private var scene : Scene3D;
 		
@@ -37,14 +41,68 @@ package {
 			scene.camera.z = -100;
 			
 			var mesh : Mesh3D = readMesh(new MeshData());
-			mesh.frames = readAnim(new AnimData());			// what the fuck bug
+			mesh.frames = readAnim(new AnimData());			// what the fucking bug
 			mesh.addEventListener(Pivot3D.ENTER_FRAME_EVENT, onUpdate);
+			
+			parseCamera(new CameraData());
 			
 			scene.addChild(mesh); 
 			scene.addChild(new Trident());
 			scene.addChild(new Grid3D(21, 21, 10));
 		}
-		  
+				
+		private function parseCamera(bytes : ByteArray) : void {
+			bytes.endian = Endian.LITTLE_ENDIAN;
+			bytes.uncompress();
+			
+			var len : int = bytes.readInt();
+			var name : String = bytes.readUTFBytes(len);
+			
+			var w : Number = bytes.readFloat();
+			var h : Number = bytes.readFloat();
+			var near : Number = bytes.readFloat();
+			var far  : Number = bytes.readFloat();
+			var fieldOfView : Number = bytes.readFloat();
+			
+//			scene.setViewport(0, 0, w, h);
+			scene.camera.near = near;
+			scene.camera.far  = far;
+			scene.camera.fieldOfView = fieldOfView;
+			
+			var vec : Vector3D = new Vector3D();
+			// 读取相机位置
+			for (var j:int = 0; j < 3; j++) {
+				vec.x = bytes.readFloat();				
+				vec.y = bytes.readFloat();	
+				vec.z = bytes.readFloat();	
+				vec.w = bytes.readFloat();	
+				scene.camera.transform.copyRowFrom(j, vec);
+			}
+			// 读取相机动画
+			len = bytes.readInt();
+			scene.camera.frames = new Vector.<Frame3D>();
+			for (var i:int = 0; i < len; i++) {
+				var frame : Frame3D = new Frame3D();
+				for (var n:int = 0; n < 3; n++) {
+					vec.x = bytes.readFloat();				
+					vec.y = bytes.readFloat();	
+					vec.z = bytes.readFloat();	
+					vec.w = bytes.readFloat();	
+					frame.copyRowFrom(n, vec);
+				}
+				scene.camera.frames.push(frame);
+			}
+			
+			scene.camera.addEventListener(Pivot3D.ENTER_FRAME_EVENT, onCameraUpdate);
+		}
+		
+		protected function onCameraUpdate(event:Event) : void {
+			scene.camera.currentFrame += 1;		
+			if (scene.camera.currentFrame >= scene.camera.frames.length - 1) {
+				scene.camera.currentFrame = 0;
+			}
+		}
+				
 		protected function onUpdate(event:Event) : void {
 			var mesh : Mesh3D = event.target as Mesh3D;
 			mesh.currentFrame += 1;
