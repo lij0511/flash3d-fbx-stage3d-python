@@ -4,7 +4,6 @@ package {
 	import flash.display.StageAlign;
 	import flash.display.StageScaleMode;
 	import flash.events.Event;
-	import flash.geom.Matrix3D;
 	import flash.geom.Vector3D;
 	import flash.utils.ByteArray;
 	import flash.utils.Endian;
@@ -19,15 +18,16 @@ package {
 	import flare.materials.filters.ColorFilter;
 	import flare.primitives.Cube;
 	import flare.primitives.Sphere;
-	import flare.utils.Matrix3DUtils;
 	
 	public class FbxParser extends Sprite {
 		
 //		[Embed(source="teapot_Teapot001.mesh", mimeType="application/octet-stream")]
 		[Embed(source="Test2_Teapot001.mesh", mimeType="application/octet-stream")]
+//		[Embed(source="yasuo_transformYasuo.mesh", mimeType="application/octet-stream")]
 		private var MeshData : Class;  
 //		[Embed(source="teapot_Teapot001.anim", mimeType="application/octet-stream")]
 		[Embed(source="Test2_Teapot001.anim", mimeType="application/octet-stream")]
+//		[Embed(source="yasuo_transformYasuo.anim", mimeType="application/octet-stream")]
 		private var AnimData : Class;
 		[Embed(source="Test22_.camera", mimeType="application/octet-stream")]
 		private var CameraData : Class;
@@ -102,7 +102,7 @@ package {
 			
 			scene.camera.addEventListener(Pivot3D.ENTER_FRAME_EVENT, onCameraUpdate);
 		}
-		  
+				
 		protected function createIdentity() : Pivot3D {
 			var cube : Cube = new Cube("", 10, 10, 100);
 			var sp : Sphere = new Sphere();
@@ -139,9 +139,7 @@ package {
 			var type : int = bytes.readInt();
 			var num  : int = bytes.readInt();
 			var vec  : Vector3D = new Vector3D();
-			var axis : Matrix3D = new Matrix3D();
-			Matrix3DUtils.setRotation(axis, 90, 0, 0);
-			
+						
 			for (var i:int = 0; i < num; i++) {
 				var frame : Frame3D = new Frame3D();
 				for (var j:int = 0; j < 3; j++) {
@@ -156,7 +154,7 @@ package {
 			
 			return frames;
 		}
-		    
+		
 		private function readMesh(bytes : ByteArray) : Mesh3D {
 			var mesh : Mesh3D = new Mesh3D();
 			// 小头解压    
@@ -214,7 +212,7 @@ package {
 				vertexSurf.sources[Surface3D.NORMAL] = normalSurf;
 			}
 			vertexSurf.material = new Shader3D("", [new ColorFilter(0xFF0000)]);
-			
+						
 			mesh.surfaces.push(vertexSurf);
 			
 			return mesh;
