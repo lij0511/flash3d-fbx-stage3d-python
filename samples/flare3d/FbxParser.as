@@ -17,35 +17,41 @@ package {
 	import flare.core.Surface3D;
 	import flare.materials.Shader3D;
 	import flare.materials.filters.ColorFilter;
+	import flare.primitives.Cube;
+	import flare.primitives.Sphere;
 	import flare.utils.Matrix3DUtils;
 	
-	public class FbxParser extends Sprite {  
+	public class FbxParser extends Sprite {
 		
 //		[Embed(source="teapot_Teapot001.mesh", mimeType="application/octet-stream")]
-		[Embed(source="Test2_Box002.mesh", mimeType="application/octet-stream")]
+		[Embed(source="Test2_Teapot001.mesh", mimeType="application/octet-stream")]
 		private var MeshData : Class;  
 //		[Embed(source="teapot_Teapot001.anim", mimeType="application/octet-stream")]
-		[Embed(source="Test2_Box002.anim", mimeType="application/octet-stream")]
+		[Embed(source="Test2_Teapot001.anim", mimeType="application/octet-stream")]
 		private var AnimData : Class;
-		[Embed(source="Test2_.camera", mimeType="application/octet-stream")]
+		[Embed(source="Test22_.camera", mimeType="application/octet-stream")]
 		private var CameraData : Class;
 		
-		private var scene : Scene3D;
-		
-		public function FbxParser() {
-			
+		private var scene	: Scene3D;
+		private var identity	: Pivot3D;     
+		  
+		public function FbxParser() {   
+			  
 			stage.scaleMode = StageScaleMode.NO_SCALE;
 			stage.align = StageAlign.TOP_LEFT;
-			
+			 
 			scene = new Viewer3D(this);
+			scene.camera.far = 10000;
 			scene.camera.z = -100;
-			
+			 
 			var mesh : Mesh3D = readMesh(new MeshData());
 			mesh.frames = readAnim(new AnimData());			// what the fucking bug
 			mesh.addEventListener(Pivot3D.ENTER_FRAME_EVENT, onUpdate);
+						 
+			identity = createIdentity();
 			
 			parseCamera(new CameraData());
-			
+						
 			scene.addChild(mesh); 
 			scene.addChild(new Trident());
 			scene.addChild(new Grid3D(21, 21, 10));
@@ -64,7 +70,6 @@ package {
 			var far  : Number = bytes.readFloat();
 			var fieldOfView : Number = bytes.readFloat();
 			
-//			scene.setViewport(0, 0, w, h);
 			scene.camera.near = near;
 			scene.camera.far  = far;
 			scene.camera.fieldOfView = fieldOfView;
@@ -78,9 +83,10 @@ package {
 				vec.w = bytes.readFloat();	
 				scene.camera.transform.copyRowFrom(j, vec);
 			}
-			// 读取相机动画
+			// 读取相机动画          
 			len = bytes.readInt();
 			scene.camera.frames = new Vector.<Frame3D>();
+			identity.frames = new Vector.<Frame3D>();
 			for (var i:int = 0; i < len; i++) {
 				var frame : Frame3D = new Frame3D();
 				for (var n:int = 0; n < 3; n++) {
@@ -90,10 +96,23 @@ package {
 					vec.w = bytes.readFloat();	
 					frame.copyRowFrom(n, vec);
 				}
-				scene.camera.frames.push(frame);
+				identity.frames.push(frame);
+				scene.camera.frames.push(frame);  
 			}
 			
 			scene.camera.addEventListener(Pivot3D.ENTER_FRAME_EVENT, onCameraUpdate);
+		}
+		  
+		protected function createIdentity() : Pivot3D {
+			var cube : Cube = new Cube("", 10, 10, 100);
+			var sp : Sphere = new Sphere();
+			sp.z = 50;
+			cube.addChild(sp);
+			var cu : Cube = new Cube();
+			cu.y = 10;
+			cube.addChild(cu);
+			
+			return cube;
 		}
 		
 		protected function onCameraUpdate(event:Event) : void {
@@ -102,7 +121,7 @@ package {
 				scene.camera.currentFrame = 0;
 			}
 		}
-				
+		
 		protected function onUpdate(event:Event) : void {
 			var mesh : Mesh3D = event.target as Mesh3D;
 			mesh.currentFrame += 1;
@@ -110,7 +129,7 @@ package {
 				mesh.currentFrame = 0;
 			}
 		}
-				
+		
 		private function readAnim(bytes : ByteArray) : Vector.<Frame3D> {
 			bytes.uncompress();
 			bytes.endian = Endian.LITTLE_ENDIAN;
@@ -137,15 +156,25 @@ package {
 			
 			return frames;
 		}
-		
+		    
 		private function readMesh(bytes : ByteArray) : Mesh3D {
-			// 小头解压
-			bytes.uncompress();
+			var mesh : Mesh3D = new Mesh3D();
+			// 小头解压    
+			bytes.uncompress(); 
 			bytes.endian = Endian.LITTLE_ENDIAN;
 			var len : int = 0;
 			// 名称
 			len = bytes.readInt();
-			var name : String = bytes.readUTFBytes(len);
+			mesh.name = bytes.readUTFBytes(len);
+			// 读取localMatrix
+			var vec   : Vector3D = new Vector3D();
+			for (var j:int = 0; j < 3; j++) {
+				vec.x = bytes.readFloat();				
+				vec.y = bytes.readFloat();	
+				vec.z = bytes.readFloat();	
+				vec.w = bytes.readFloat();	
+				mesh.transform.copyRowFrom(j, vec);
+			}
 			// 顶点
 			len = bytes.readInt();
 			var vertexBytes : ByteArray = new ByteArray();
@@ -185,7 +214,7 @@ package {
 				vertexSurf.sources[Surface3D.NORMAL] = normalSurf;
 			}
 			vertexSurf.material = new Shader3D("", [new ColorFilter(0xFF0000)]);
-			var mesh : Mesh3D = new Mesh3D();
+			
 			mesh.surfaces.push(vertexSurf);
 			
 			return mesh;
