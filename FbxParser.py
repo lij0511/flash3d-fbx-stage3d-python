@@ -15,7 +15,6 @@ import json
 import os
 import re
 import struct
-import sys
 import zlib
 
 # object
@@ -32,6 +31,9 @@ CAMERA_TYPE = ".camera"
 
 AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(-90, 180, 0), FbxVector4(-1, 1, 1))
 AXIS_FLIP_X = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
+
+# 最大权重数量
+MAX_WEIGHT_NUM = 4
 
 # 配置文件
 config = LObject()
@@ -234,18 +236,17 @@ class Camera3D(object):
     
     # 解析相机动画
     def parseCameraAnim(self):
-        fps = FbxTime.GetFrameRate(self.scene.GetGlobalSettings().GetTimeMode())
-        print("\tfps:%d" % (fps))
-        timeSpan  = self.scene.GetSrcObject(FbxAnimStack.ClassId, 0).GetLocalTimeSpan()
-        totalTime = timeSpan.GetStop().Get() - timeSpan.GetStart().Get()
-        time = FbxTime()
-        timeStep = 1.0 / fps
-        time.SetSecondDouble(timeStep)
-        frameCount = totalTime / time.Get()
-        print("\ttotal frames:%d" % frameCount)
-        # 解析每一帧数据
-        for frame in range(frameCount):
-            time.SetSecondDouble(frame * timeStep)
+        # 获取stack
+        stack = self.scene.GetSrcObject(FbxAnimStack.ClassId, 0)
+        self.scene.SetCurrentAnimationStack(stack)
+        # 获取时间
+        timeSpan  = stack.GetLocalTimeSpan()
+        time      = timeSpan.GetStart()
+        # frameTime
+        frameTime = FbxTime()
+        frameTime.SetTime(0, 0, 0, 1, 0, self.scene.GetGlobalSettings().GetTimeMode())
+        # 解析每一帧动画
+        while time <= timeSpan.GetStop():
             animMt = AXIS_FLIP_X * self.fbxCamera.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
             matrix = Matrix3D(animMt)
             clip   = []
@@ -257,6 +258,9 @@ class Camera3D(object):
                     pass
                 pass # end for
             self.anim.append(clip)
+            time += frameTime
+            pass
+        
         pass # end func
     
     # 生成相机数据
@@ -333,6 +337,28 @@ class Camera3D(object):
 
     pass # end class
 
+# 骨骼节点
+class SkeletonJoint(object):
+    
+    def __init__(self):
+        super(SkeletonJoint, self).__init__()
+        self.node           = None          # 骨骼Node
+        self.name           = None          # 骨骼名称
+        self.index          = -1            # 骨骼索引
+        self.parentIndex    = -1            # 父级骨骼索引
+        self.cluster        = None          # 骨骼
+        self.linkTransform  = None          # link Transform
+        pass # end func
+    
+    # 通过cluster初始化
+    def initWithCluster(self, cluster):
+        self.node = cluster.GetLink()
+        self.name = str(self.node.GetName())
+        self.cluster = cluster
+        pass # end func
+    
+    pass # end class
+
 # 场景
 class Scene3D(object):
 
@@ -340,6 +366,7 @@ class Scene3D(object):
     def __init__(self):
         super(Scene3D, self).__init__()
         self.cameras = [] # 相机列表
+        self.meshs   = [] # 模型列表
         pass # end func
     
     pass # end class
@@ -365,8 +392,11 @@ class Mesh(object):
         self.normals            = []            # 法线
         self.verticesIndices    = []            # 顶点索引
         self.uvIndices          = []            # uv索引
-        self.indices            = []            # 索引
         self.anims              = []            # 动画|如果为骨骼模型，那么保存骨骼数据，否则就保存帧Transform数据
+        self.joints             = []            # 骨骼列表
+        self.skeletonIndices    = {}            # 顶点索引，骨骼对应的顶点索引。
+        self.skeletonWeights    = {}            # 骨骼权重，骨骼对应的顶点权重。
+        self.weightsAndIndices  = []            # 权重以及索引
         self.bounds             = LObject()     # 包围盒
         self.meshBytes          = None          # Mesh数据
         self.animBytes          = None          # 动作数据
@@ -382,7 +412,7 @@ class Mesh(object):
         
         self.geometryTransform  = GetGeometryTransform(self.fbxMesh.GetNode())
         self.invGeometryTrans   = FbxAMatrix(self.geometryTransform)
-        self.invGeometryTrans.Inverse()
+        self.invGeometryTrans   = self.invGeometryTrans.Inverse()
         
         localTransform = self.fbxMesh.GetNode().EvaluateLocalTransform()
         globalTransform= self.fbxMesh.GetNode().EvaluateGlobalTransform()
@@ -393,7 +423,7 @@ class Mesh(object):
         
         self.axisTransform    = AXIS_FLIP_L * self.geometryTransform
         self.invAxisTransform = FbxAMatrix(self.axisTransform)
-        self.invAxisTransform.Inverse()
+        self.invAxisTransform = self.invAxisTransform.Inverse()
         
         pass # end func
     
@@ -412,11 +442,36 @@ class Mesh(object):
                 self.uvIndices.append(uvIdx)
                 pass # end for
             pass # end for
-        # 生成索引
-        count = count * 3
+        pass # end func
+    
+    # 解析包围盒，骨骼动画不会解析每一帧包围盒
+    def parseBounds(self):
+        count = len(self.vertices)
+        vert = self.vertices[0]
+        self.bounds.min = [vert[0], vert[1], vert[2]]
+        self.bounds.max = [vert[0], vert[1], vert[2]]
         for i in range(count):
-            self.indices.append(i)
-            pass
+            vert = self.vertices[i]
+            if vert[0] < self.bounds.min[0]:
+                self.bounds.min[0] = vert[0]
+                pass
+            if vert[1] < self.bounds.min[1]:
+                self.bounds.min[1] = vert[1]
+                pass
+            if vert[2] < self.bounds.min[2]:
+                self.bounds.min[2] = vert[2]
+                pass
+            if vert[0] > self.bounds.max[0]:
+                self.bounds.max[0] = vert[0]
+                pass
+            if vert[1] > self.bounds.max[1]:
+                self.bounds.max[1] = vert[1]
+                pass
+            if vert[2] > self.bounds.max[2]:
+                self.bounds.max[2] = vert[2]
+                pass
+            pass # end func
+        print("\tbounds:Min[%f %f %f] Max:[%f %f %f]" % (self.bounds.min[0], self.bounds.min[1], self.bounds.min[2], self.bounds.max[0], self.bounds.max[1], self.bounds.max[2]))
         pass # end func
     
     # 解析顶点
@@ -455,6 +510,8 @@ class Mesh(object):
             self.vertices[i * 3 + 1] = v2
             self.vertices[i * 3 + 2] = v1
             pass # end for
+        # 解析包围盒
+        self.parseBounds()
         pass # end func
     
     # 解析UV0
@@ -540,14 +597,113 @@ class Mesh(object):
             pass # end for
         pass # end func
     
+    # 解析权重以及索引
+    def parseIndicesAndWeights(self):
+        
+        count = self.fbxMesh.GetControlPointsCount()
+        indicesAndWeights = []
+        
+        for i in range(count):
+            skeJoints  = self.skeletonIndices[i]
+            skeWeights = self.skeletonWeights[i]
+            indices    = []
+            weights    = []
+            size = len(skeJoints)
+            # 最多允许四个权重
+            if size > MAX_WEIGHT_NUM:
+                size = MAX_WEIGHT_NUM
+                pass
+            # 保存权重以及索引数据
+            for j in range(size):
+                weights.append(skeWeights[j])
+                indices.append(skeJoints[j].index)
+                pass
+            for j in range(MAX_WEIGHT_NUM - size):
+                weights.append(0)
+                indices.append(0)
+                pass
+            indicesAndWeights.append(weights + indices)
+            pass
+        # 组织权重数据
+        count = self.fbxMesh.GetPolygonCount()
+        for i in range(count):
+            for j in range(3):
+                # 顶点索引
+                vertIdx = self.fbxMesh.GetPolygonVertex(i, j)
+                self.weightsAndIndices.append(indicesAndWeights[vertIdx])
+                pass
+            pass
+        # 重构索引
+        for i in range(count):
+            v0 = self.weightsAndIndices[i * 3 + 0]
+            v1 = self.weightsAndIndices[i * 3 + 1]
+            v2 = self.weightsAndIndices[i * 3 + 2]
+            self.weightsAndIndices[i * 3 + 0] = v0
+            self.weightsAndIndices[i * 3 + 1] = v2
+            self.weightsAndIndices[i * 3 + 2] = v1
+            pass # end for
+        
+        pass # end func
+    
     # 解析骨骼权重以及索引
     def parseCluster(self):   
-        
+        print("\tparse skeleton...")
+        skinDeformer = self.fbxMesh.GetDeformer(0, FbxDeformer.eSkin)
+        clusterCount = skinDeformer.GetClusterCount()
+        print("\tmesh:[%s] has %d bones..." % (self.name, clusterCount))
+        for clusterIdx in range(clusterCount):
+            cluster = skinDeformer.GetCluster(clusterIdx)
+            joint   = SkeletonJoint()
+            joint.initWithCluster(cluster)
+            joint.index = clusterIdx
+            self.joints.append(joint)
+            print("\tBoneName:%s" % joint.name)
+            # 解析骨骼权重以及顶点索引
+            indices = cluster.GetControlPointIndices()          # 顶点的索引
+            weights = cluster.GetControlPointWeights()          # 顶点的权重
+            count   = len(indices)
+            for i in range(count):
+                verIdx = indices[i]
+                weight = weights[i]
+                # 顶点还未被记录到字典
+                if not self.skeletonIndices.get(verIdx):
+                    self.skeletonIndices[verIdx] = []
+                    self.skeletonWeights[verIdx] = []
+                    pass
+                # 将骨骼保存到对应的顶点中去
+                self.skeletonIndices[verIdx].append(joint)
+                # 将权重保存到对应的顶点中去
+                self.skeletonWeights[verIdx].append(weight)
+                pass # end for
+            pass # end for
         pass # end
+    
+    # 解析骨骼的帧动画
+    def parseJointFrameAnim(self, joint, time):
+        cluster = joint.cluster
+        # 获取当前帧骨骼的global transform
+        frameGlobalTransform = cluster.GetLink().EvaluateGlobalTransform(time)
+        # 获取bindtransform
+        bindTransform  = FbxAMatrix()
+        cluster.GetTransformMatrix(bindTransform)
+        bindTransform *= self.geometryTransform
+        # 骨骼global初始矩阵
+        clusterGlobalInitTransform = FbxAMatrix()
+        cluster.GetTransformLinkMatrix(clusterGlobalInitTransform)
+        # 转换 vert * axis * invAxis * bindTransform * invGlobalInit * BoneGlobal * InvMeshGlobal * AXIS_FLIP_X
+        vertexTransform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform().Inverse() * frameGlobalTransform * clusterGlobalInitTransform.Inverse() * bindTransform * self.invAxisTransform
+        
+        return vertexTransform
+        pass
     
     # 解析骨骼动画
     def parseSkeletonAnim(self, time):
-        
+        clip  = []
+        count = len(self.joints)
+        for i in range(count):
+            clip.append(self.parseJointFrameAnim(self.joints[i], time))
+            pass # end func
+        self.anims.append(clip)
         pass
     
     # 解析帧动画
@@ -567,6 +723,30 @@ class Mesh(object):
         self.anims.append(clip)
         pass # end func
     
+#     def CPUSkeleton(self):
+#         # 解析第一帧动画
+#         count = len(self.vertices)
+#         joints= self.anims[0]
+#         for i in range(count):
+#             v       = self.vertices[i]
+#             weiIdxs = self.weightsAndIndices[i]
+#             result  = [0, 0, 0]
+#             # 转换
+#             for j in range(4):
+#                 idx = weiIdxs[4 + j]
+#                 wei = weiIdxs[j]
+#                 join = joints[idx]
+#                 vert = FbxVector4(v[0], v[1], v[2], 1)
+#                 vert = join.MultT(vert)
+#                 result[0] += vert[0] * wei
+#                 result[1] += vert[1] * wei
+#                 result[2] += vert[2] * wei
+#                 pass
+#             # 保存
+#             self.vertices[i] = result
+#             pass 
+#         pass
+    
     # 解析动画
     def parseAnim(self):
         print("\tparse animation...")
@@ -577,27 +757,28 @@ class Mesh(object):
         # 如果为骨骼动画，则需要事先解析骨骼
         if self.skeleton:
             self.parseCluster()
+            self.parseIndicesAndWeights()
             pass #
-        # 获取帧频
-        fps = FbxTime.GetFrameRate(self.scene.GetGlobalSettings().GetTimeMode())
-        print("\tfps:%d" % (fps))
-        timeSpan  = self.scene.GetSrcObject(FbxAnimStack.ClassId, 0).GetLocalTimeSpan()
-        totalTime = timeSpan.GetStop().Get() - timeSpan.GetStart().Get()
-        time = FbxTime()
-        timeStep = 1.0 / fps
-        time.SetSecondDouble(timeStep)
-        frameCount = totalTime / time.Get()
-        print("\ttotal frames:%d" % frameCount)
-        # 解析每一帧数据
-        for frame in range(frameCount):
-            time.SetSecondDouble(frame * timeStep)
+        # 获取stack
+        stack = self.scene.GetSrcObject(FbxAnimStack.ClassId, 0)
+        self.scene.SetCurrentAnimationStack(stack)
+        # 获取时间
+        timeSpan  = stack.GetLocalTimeSpan()
+        time      = timeSpan.GetStart()
+        # frameTime
+        frameTime = FbxTime()
+        frameTime.SetTime(0, 0, 0, 1, 0, self.scene.GetGlobalSettings().GetTimeMode())
+        # 解析每一帧动画
+        while time <= timeSpan.GetStop():
             if self.skeleton:                           
                 self.parseSkeletonAnim(time)            # 解析骨骼动画
                 pass
             else:
                 self.parseFrameAnim(time)               # 解析帧动画
                 pass
+            time += frameTime
             pass
+        
         pass # end func
     
     # 生成模型数据
@@ -641,7 +822,7 @@ class Mesh(object):
         for i in range(count):
             uv = self.uvs1[i]
             data += struct.pack('<ff', uv[0], uv[1])
-            pass # end for
+            pass # end for 
         # 写法线
         count = len(self.normals)
         data += struct.pack('<i', count)
@@ -649,6 +830,14 @@ class Mesh(object):
             normal = self.normals[i]
             data  += struct.pack('<fff', normal[0], normal[1], normal[2])
             pass
+        # 写权重数据
+        count = len(self.weightsAndIndices)
+        data += struct.pack('<i', count)
+        for i in range(count):
+            weIdx = self.weightsAndIndices[i]
+            data += struct.pack('<ffff', weIdx[0], weIdx[1], weIdx[2], weIdx[3])
+            data += struct.pack('<HHHH', weIdx[4] * 3, weIdx[5] * 3, weIdx[6] * 3, weIdx[7] * 3)
+            pass # end
         # 写包围盒数据
         data += struct.pack('<ffffff', self.bounds.min[0], self.bounds.min[1], self.bounds.min[2], self.bounds.max[0], self.bounds.max[1], self.bounds.max[2])
         # 压缩
@@ -675,6 +864,26 @@ class Mesh(object):
         return data
         pass # end func
     
+    # 生成骨骼动画数据
+    def generateSkeletonAnimBytes(self):
+        data = b''
+        # 类型
+        data += struct.pack('<i', 1)
+        # 写入帧数
+        count = len(self.anims)
+        data += struct.pack('<i', count)
+        # 写入骨骼数量
+        data += struct.pack('<i', len(self.joints))
+        # 写入数据
+        for i in range(count):
+            clip = self.anims[i]
+            for j in range(len(clip)):
+                data+= getMatrix3DBytes(clip[j])
+                pass # end for
+            pass # end for
+        return data
+        pass # end func
+    
     # 生成动画数据
     def generateAnimBytes(self):
         # 生成Mesh对应的文件名称
@@ -686,13 +895,12 @@ class Mesh(object):
         self.animFileName = fbxDir + fbxName + "_" + self.name + ANIM_TYPE
         # 动画类型:0->帧动画;1->矩阵骨骼动画;2->四元数骨骼动画
         data = None
-        
         if self.skeleton:
+            data = self.generateSkeletonAnimBytes()
             pass
         else:
             data = self.generateFrameAnimBytes()
             pass
-        
         data = zlib.compress(data, 9)
         self.animBytes = data
         pass # end func
@@ -799,7 +1007,9 @@ if __name__ == "__main__":
     # 解析参数
     config = parseArgument()
     fbxList = scanFbxFiles(config.path)
-#     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/Test22.FBX"]
+    fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/yasuo.FBX"]
+    fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/nvhai.fbx"]
+    
     for item in fbxList:
         parseFBX(item, config)
         pass
