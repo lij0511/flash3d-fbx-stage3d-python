@@ -1007,8 +1007,6 @@ if __name__ == "__main__":
     # 解析参数
     config = parseArgument()
     fbxList = scanFbxFiles(config.path)
-    fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/yasuo.FBX"]
-    fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/nvhai.fbx"]
     
     for item in fbxList:
         parseFBX(item, config)
