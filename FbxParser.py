@@ -1233,9 +1233,12 @@ if __name__ == "__main__":
     # 解析参数
     config = parseArgument()
     fbxList = scanFbxFiles(config.path)
+<<<<<<< HEAD
 #     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/yasuo.FBX"]
 #     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/nvhai.fbx"]
 #     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/ship/ship.fbx"]
+=======
+>>>>>>> FETCH_HEAD
     
     for item in fbxList:
         parseFBX(item, config)
