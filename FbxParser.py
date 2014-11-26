@@ -2,16 +2,13 @@
 
 ''' 
 
-1、二进制文件采用小头并压缩方式保存。
-2、不会保存三角形索引数据，三角索引数据自行生成，顺序为0，1，2，3，4，5，6...。使用顺时针顺序。
-3、各个部分数据分块存储。可以将整块数据读入到bytes，然后整块直接上传。
-
 '''
 
 from FbxCommon import *
 from string import count
 import argparse
 import json
+import math
 import os
 import re
 import struct
@@ -28,13 +25,13 @@ class LObject(object):
 MESH_TYPE   = ".mesh"
 ANIM_TYPE   = ".anim"
 CAMERA_TYPE = ".camera"
-
+# 翻转
 AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(-90, 180, 0), FbxVector4(-1, 1, 1))
 AXIS_FLIP_X = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
-
 # 最大权重数量
 MAX_WEIGHT_NUM = 4
-
+# 最大顶点数
+MAX_VERTEX_NUM = 65535
 # 配置文件
 config = LObject()
 
@@ -56,6 +53,12 @@ def parseArgument():
     parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = True)
     # 指定Fbx文件路径
     parser.add_argument("-path",    help = "fbx file path  ",   action = "store",           default = "")
+    # 使用四元数方式
+    parser.add_argument("-quat",    help = "quat with anima",   action = "store_true",      default = False)
+    # 使用四元数时，最大骨骼数
+    parser.add_argument("-max_quat",help = "bone num with quat",action = "store",           default = 56)
+    # 使用矩阵时，最大骨骼数
+    parser.add_argument("-max_m34", help = "bone num with m34", action = "store",           default = 36)
     
     option = parser.parse_args()
     
@@ -75,7 +78,7 @@ def scanFbxFiles(args):
             sourceDir = os.getcwd()
             pass
         pass
-    
+    # 拼接fbx文件
     fbxList = []
     if os.path.isfile(sourceDir):
         fbxList.append(sourceDir)
@@ -90,7 +93,7 @@ def scanFbxFiles(args):
                     pass
                 pass
         pass
-    
+    # 打印
     for item in fbxList:
         print("find fbx file: %s" % item)
         pass
@@ -386,24 +389,25 @@ class Mesh(object):
         self.axisTransform      = None          # 坐标系矩阵
         self.invAxisTransform   = None          # 坐标系逆矩阵
         self.vertices           = []            # 顶点
-        self.weights            = []            # 权重以及索引数据|骨骼动画必须
-        self.uvs0               = []            # UV
+        self.uvs0               = []            # UV0
         self.uvs1               = []            # UV1,可能为烘焙贴图UV
         self.normals            = []            # 法线
+        self.weightsAndIndices  = []            # 权重以及索引
+        self.bounds             = LObject()     # 包围盒
+        self.anims              = []            # 动画|如果为骨骼模型，那么保存骨骼数据，否则就保存帧Transform数据
         self.verticesIndices    = []            # 顶点索引
         self.uvIndices          = []            # uv索引
-        self.anims              = []            # 动画|如果为骨骼模型，那么保存骨骼数据，否则就保存帧Transform数据
         self.joints             = []            # 骨骼列表
         self.skeletonIndices    = {}            # 顶点索引，骨骼对应的顶点索引。
         self.skeletonWeights    = {}            # 骨骼权重，骨骼对应的顶点权重。
-        self.weightsAndIndices  = []            # 权重以及索引
-        self.bounds             = LObject()     # 包围盒
         self.meshBytes          = None          # Mesh数据
         self.animBytes          = None          # 动作数据
         self.meshFileName       = None          # Mesh文件名
-        self.animFileName       = None          # 动作文件名
-        self.bounds.min = [0, 0, 0]
-        self.bounds.max = [0, 0, 0]
+        self.animFileName       = None          # Anim文件名
+        self.bounds.min         = [0, 0, 0]     # min
+        self.bounds.max         = [0, 0, 0]     # max
+        self.geometries         = []            # sub geometry
+        
         pass #end func
     
     # 解析矩阵
@@ -540,7 +544,7 @@ class Mesh(object):
             pass # end if
         pass # end func
     
-    # 解析UV
+    # 解析UV1
     def parseUV1(self):
         layerCount = self.fbxMesh.GetLayerCount()
         if layerCount >= 2:
@@ -723,30 +727,6 @@ class Mesh(object):
         self.anims.append(clip)
         pass # end func
     
-#     def CPUSkeleton(self):
-#         # 解析第一帧动画
-#         count = len(self.vertices)
-#         joints= self.anims[0]
-#         for i in range(count):
-#             v       = self.vertices[i]
-#             weiIdxs = self.weightsAndIndices[i]
-#             result  = [0, 0, 0]
-#             # 转换
-#             for j in range(4):
-#                 idx = weiIdxs[4 + j]
-#                 wei = weiIdxs[j]
-#                 join = joints[idx]
-#                 vert = FbxVector4(v[0], v[1], v[2], 1)
-#                 vert = join.MultT(vert)
-#                 result[0] += vert[0] * wei
-#                 result[1] += vert[1] * wei
-#                 result[2] += vert[2] * wei
-#                 pass
-#             # 保存
-#             self.vertices[i] = result
-#             pass 
-#         pass
-    
     # 解析动画
     def parseAnim(self):
         print("\tparse animation...")
@@ -802,42 +782,57 @@ class Mesh(object):
         else:
             data += getMatrix3DBytes(AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform)
             pass
-        # 写顶点
-        count = len(self.vertices)
-        data += struct.pack('<i', count)            
-        for i in range(count):                     
-            vert = self.vertices[i]
-            data += struct.pack('<fff', vert[0], vert[1], vert[2])
+        # 写SubMesh数量
+        subNum = len(self.geometries)
+        data  += struct.pack("<i", subNum)
+        # 写数据
+        for subIdx in range(subNum):
+            subMesh = self.geometries[subIdx]
+            # 写顶点
+            count = len(subMesh.vertices)
+            data += struct.pack('<i', count)            
+            for i in range(count):                     
+                vert = subMesh.vertices[i]
+                data += struct.pack('<fff', vert[0], vert[1], vert[2])
+                pass # end for
+            # 写UV0
+            count = len(subMesh.uvs0)                      
+            data += struct.pack('<i', count)
+            for i in range(count):
+                uv = subMesh.uvs0[0]
+                data += struct.pack('<ff', uv[0], uv[1])
+                pass # end for
+            # 写UV1
+            count = len(subMesh.uvs1)
+            data += struct.pack('<i', count)
+            for i in range(count):
+                uv = subMesh.uvs1[i]
+                data += struct.pack('<ff', uv[0], uv[1])
+                pass # end for 
+            # 写法线
+            count = len(subMesh.normals)
+            data += struct.pack('<i', count)
+            for i in range(count):
+                normal = subMesh.normals[i]
+                data  += struct.pack('<fff', normal[0], normal[1], normal[2])
+                pass
+            # 写权重数据
+            count = len(subMesh.weightsAndIndices)
+            data += struct.pack('<i', count)
+            for i in range(count):
+                weIdx = subMesh.weightsAndIndices[i]
+                data += struct.pack('<ffff', weIdx[0], weIdx[1], weIdx[2], weIdx[3])
+                pass # end
+            count = len(subMesh.weightsAndIndices)
+            data += struct.pack('<i', count)
+            # 写骨骼索引数据
+            for i in range(count):
+                weIdx = subMesh.weightsAndIndices[i]
+                data += struct.pack('<ffff', weIdx[4] * 3, weIdx[5] * 3, weIdx[6] * 3, weIdx[7] * 3)
+                pass
+            
             pass # end for
-        # 写UV0
-        count = len(self.uvs0)                      
-        data += struct.pack('<i', count)
-        for i in range(count):
-            uv = self.uvs0[0]
-            data += struct.pack('<ff', uv[0], uv[1])
-            pass # end for
-        # 写UV1
-        count = len(self.uvs1)
-        data += struct.pack('<i', count)
-        for i in range(count):
-            uv = self.uvs1[i]
-            data += struct.pack('<ff', uv[0], uv[1])
-            pass # end for 
-        # 写法线
-        count = len(self.normals)
-        data += struct.pack('<i', count)
-        for i in range(count):
-            normal = self.normals[i]
-            data  += struct.pack('<fff', normal[0], normal[1], normal[2])
-            pass
-        # 写权重数据
-        count = len(self.weightsAndIndices)
-        data += struct.pack('<i', count)
-        for i in range(count):
-            weIdx = self.weightsAndIndices[i]
-            data += struct.pack('<ffff', weIdx[0], weIdx[1], weIdx[2], weIdx[3])
-            data += struct.pack('<HHHH', weIdx[4] * 3, weIdx[5] * 3, weIdx[6] * 3, weIdx[7] * 3)
-            pass # end
+        
         # 写包围盒数据
         data += struct.pack('<ffffff', self.bounds.min[0], self.bounds.min[1], self.bounds.min[2], self.bounds.max[0], self.bounds.max[1], self.bounds.max[2])
         # 压缩
@@ -869,18 +864,25 @@ class Mesh(object):
         data = b''
         # 类型
         data += struct.pack('<i', 1)
-        # 写入帧数
-        count = len(self.anims)
-        data += struct.pack('<i', count)
-        # 写入骨骼数量
-        data += struct.pack('<i', len(self.joints))
-        # 写入数据
-        for i in range(count):
-            clip = self.anims[i]
-            for j in range(len(clip)):
-                data+= getMatrix3DBytes(clip[j])
+        # 写入SubMe数量
+        subNum= len(self.geometries)
+        data += struct.pack('<i', subNum)
+        # 写动画数据
+        for subIdx in range(subNum):
+            subMesh = self.geometries[subIdx]
+            # 写入帧数
+            count = len(subMesh.anims)
+            data += struct.pack('<i', count)
+            # 写入骨骼数量
+            data += struct.pack('<i', len(subMesh.joints))
+            # 写入数据
+            for i in range(count):
+                clip = subMesh.anims[i]
+                for j in range(len(clip)):
+                    data+= getMatrix3DBytes(clip[j])
+                    pass # end for
                 pass # end for
-            pass # end for
+            pass
         return data
         pass # end func
     
@@ -905,14 +907,235 @@ class Mesh(object):
         self.animBytes = data
         pass # end func
     
+    # 拆分模型
+    def splitMesh(self):
+        # 不需要进行拆分
+        if not self.isNeedSplit():
+            self.geometries.append(self)
+            return
+            pass
+        # 拆分顶点数据
+        subMeshes = self.splitVertex()
+        # 对拆分出来的顶点数据进行骨骼拆分
+        for subMesh in subMeshes:
+            self.geometries += subMesh.splitBones()
+            pass
+        print(len(self.geometries))
+        pass # end func
+    
+    # 拆分顶点数据:vertex,uv0,uv1,normal,weightsAndIndices
+    def splitVertex(self):
+        count = len(self.vertices)
+        # 未达到拆分条件
+        if count < MAX_VERTEX_NUM:
+            return [self]
+            pass
+        # 开始拆分
+        idx = 0
+        subMeshes = []
+        while idx < count:
+            subMesh = Mesh()
+            # 拷贝属性
+            subMesh.fbxMesh             = self.fbxMesh
+            subMesh.sdkManager          = self.sdkManager
+            subMesh.scene               = self.scene
+            subMesh.fbxFilePath         = self.fbxFilePath
+            subMesh.name                = str(self.name + str(len(subMeshes)))
+            subMesh.skeleton            = self.skeleton
+            subMesh.geometryTransform   = self.geometryTransform
+            subMesh.axisTransform       = self.axisTransform
+            subMesh.invAxisTransform    = self.invAxisTransform
+            # 拆分数据
+            # 顶点
+            subMesh.vertices            = self.vertices[idx : idx + MAX_VERTEX_NUM]
+            # UV0
+            subMesh.uvs0                = self.uvs0[idx : idx + MAX_VERTEX_NUM]
+            # UV1
+            subMesh.uvs1                = self.uvs1[idx : idx + MAX_VERTEX_NUM]
+            # Normal
+            subMesh.normals             = self.normals[idx : idx + MAX_VERTEX_NUM]
+            # 权重索引
+            subMesh.weightsAndIndices   = self.weightsAndIndices[idx : idx + MAX_VERTEX_NUM]
+            # 包围盒
+            subMesh.bounds.min          = self.bounds.min[0:]
+            subMesh.bounds.max          = self.bounds.max[0:]
+            # 动画
+            subMesh.anims               = self.anims[0:]
+            # 骨骼
+            subMesh.joints              = self.joints[0:]
+            # ʕ•̫͡•ʕ*̫͡*ʕ
+            idx += MAX_VERTEX_NUM
+            # 添加到geometries
+            subMeshes.append(subMesh)
+            pass
+        return subMeshes
+        pass # end func
+    
+    # 拆分骨骼数据
+    def splitBones(self):
+        if not self.skeleton:
+            return [self]
+            pass
+        count = len(self.joints)
+        maxNum= 0
+        if config.quat:
+            # 使用四元数并且骨骼数量少于最大骨骼数
+            if count < config.max_quat:
+                return [self]
+                pass
+            # 使用四元数，骨骼数量大于最大骨骼数
+            maxNum = config.max_quat
+            pass
+        else:
+            # 使用矩阵并且骨骼数量少于最大骨骼数
+            if count < config.max_m34:
+                return [self]
+                pass
+            # 使用矩阵，骨骼数量大于最大骨骼数
+            maxNum = config.max_m34
+            pass
+        # 开始进行骨骼拆分
+        count = len(self.vertices)
+        count = count / 3
+        # list
+        subMeshes = []
+        subMesh   = Mesh()
+        subMesh.name = self.name + str(len(subMeshes))
+        subMeshes.append(subMesh)
+        # 遍历所有三角形
+        for i in range(count):
+            v0 = i * 3 + 0
+            v1 = i * 3 + 1
+            v2 = i * 3 + 2
+            # 搜集三角形的所有骨骼
+            idx0 = self.weightsAndIndices[v0][4:]
+            idx1 = self.weightsAndIndices[v1][4:]
+            idx2 = self.weightsAndIndices[v2][4:]
+            idxs = idx0 + idx1 + idx2
+            # 去掉重复索引
+            idxs = list(set(idxs))
+            # 将新索引添加subMesh中，并且检查骨骼数量是否超限
+            bones = set(subMesh.joints + idxs)
+            # 添加当前三角形之后，subMesh超限->创建新的subMesh
+            if len(bones) > maxNum:
+                subMesh = Mesh()
+                subMesh.name = self.name + str(len(subMeshes))
+                subMeshes.append(subMesh)
+                pass
+            # 保存骨骼索引
+            subMesh.joints = list(set(subMesh.joints + idxs))
+            # 将三角形数据添加到当前三角形
+            # 顶点
+            subMesh.vertices.append(self.vertices[v0])
+            subMesh.vertices.append(self.vertices[v1])
+            subMesh.vertices.append(self.vertices[v2])
+            # uv0
+            if len(self.uvs0) > 0:
+                subMesh.uvs0.append(self.uvs0[v0])
+                subMesh.uvs0.append(self.uvs0[v1])
+                subMesh.uvs0.append(self.uvs0[v2])
+                pass
+            # uv1
+            if len(self.uvs1) > 0:
+                subMesh.uvs1.append(self.uvs1[v0])
+                subMesh.uvs1.append(self.uvs1[v1])
+                subMesh.uvs1.append(self.uvs1[v2])
+                pass
+            # normal
+            if len(self.normals) > 0:
+                subMesh.normals.append(self.normals[v0])
+                subMesh.normals.append(self.normals[v1])
+                subMesh.normals.append(self.normals[v2])
+                pass
+            # 权重以及索引
+            if len(self.weightsAndIndices) > 0:
+                subMesh.weightsAndIndices.append(self.weightsAndIndices[v0])
+                subMesh.weightsAndIndices.append(self.weightsAndIndices[v1])
+                subMesh.weightsAndIndices.append(self.weightsAndIndices[v2])
+                pass
+            pass
+        # 重构数据
+        for subMesh in subMeshes:
+            # 拷贝属性
+            subMesh.fbxMesh             = self.fbxMesh
+            subMesh.sdkManager          = self.sdkManager
+            subMesh.scene               = self.scene
+            subMesh.fbxFilePath         = self.fbxFilePath
+            subMesh.skeleton            = self.skeleton
+            subMesh.geometryTransform   = self.geometryTransform
+            subMesh.axisTransform       = self.axisTransform
+            subMesh.invAxisTransform    = self.invAxisTransform
+            # 重构骨骼索引
+            joints  = []
+            oldIndexMap = {}
+            newIndexMap = {}
+            for idx in subMesh.joints:
+                # 保存新旧索引
+                oldIndexMap[idx] = len(joints)
+                newIndexMap[len(joints)] = idx
+                # 保存骨骼 
+                joints.append(self.joints[idx])
+                pass
+            # 设置骨骼
+            subMesh.joints = joints
+            # 重写权重索引数据
+            count = len(subMesh.weightsAndIndices)
+            for i in range(count):
+                weIdx = subMesh.weightsAndIndices[i]
+                subMesh.weightsAndIndices[i] = [weIdx[0], weIdx[1], weIdx[2], weIdx[3], oldIndexMap[weIdx[4]], oldIndexMap[weIdx[5]], oldIndexMap[weIdx[6]], oldIndexMap[weIdx[7]]]
+                pass
+            
+            # 重写动画数据
+            frameSize = len(self.anims)
+            for i in range(frameSize):
+                clip = []
+                # 遍历subMesh的Joints
+                size = len(subMesh.joints)
+                for j in range(size):
+                    # 通过新索引获取旧索引
+                    idx = newIndexMap[j]
+                    clip.append(self.anims[i][idx])
+                    pass
+                subMesh.anims.append(clip)
+                pass
+            
+            pass
+        return subMeshes
+        pass # end func
+    
+    # 检测模型是否需要进行拆分
+    def isNeedSplit(self):
+        # 检测顶点是否超过65535
+        isNeed = len(self.vertices) > MAX_VERTEX_NUM
+        # 顶点超过65535
+        if isNeed:
+            return True
+            pass
+        # 检测是否为骨骼模型
+        if not self.skeleton:
+            return False
+            pass
+        # 检测骨骼数量
+        if config.quat:     # 使用四元数
+            return len(self.joints) > config.max_quat
+            pass
+        else:               # 使用矩阵
+            return len(self.joints) > config.max_m34
+            pass
+        return False
+        pass # end func
+    
     # 初始化mesh
     def initWithFbxMesh(self, fbxMesh, sdkManager, scene, fbxFilePath):
+        
         print("parse mesh...")
+        
         self.fbxMesh    = fbxMesh
         self.sdkManager = sdkManager
         self.scene      = scene
         self.name       = str(fbxMesh.GetNode().GetName())
         self.fbxFilePath= fbxFilePath
+        
         print("\t%s" % (self.name))
         # 解析矩阵
         self.parseTransform()
@@ -932,14 +1155,17 @@ class Mesh(object):
         # 解析动画
         if config.anim:
             self.parseAnim()
+        # 拆分Mesh
+        self.splitMesh() 
         # 生成模型数据
         self.generateMeshBytes()
         # 生成动画数据
         self.generateAnimBytes()
-        
-        # 写入到磁盘
+        # 写模型数据
         open(self.meshFileName, 'w+b').write(self.meshBytes)
-        open(self.animFileName, 'w+b').write(self.animBytes)
+        # 写动画数据
+        if config.anim:
+            open(self.animFileName, 'w+b').write(self.animBytes)
         
         pass
         
@@ -1007,8 +1233,9 @@ if __name__ == "__main__":
     # 解析参数
     config = parseArgument()
     fbxList = scanFbxFiles(config.path)
-    fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/yasuo.FBX"]
-    fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/nvhai.fbx"]
+#     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/yasuo.FBX"]
+#     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/nvhai.fbx"]
+#     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/ship/ship.fbx"]
     
     for item in fbxList:
         parseFBX(item, config)
