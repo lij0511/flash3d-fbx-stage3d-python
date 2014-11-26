@@ -1,7 +1,77 @@
 # coding: utf-8
 
 ''' 
+FBX:
+    Fbx文件名、路径名以及3D场景中所有物体建议不要使用中文名称。
 
+Mesh文件读取格式:
+    小头、解压
+    size = readInt()                名称长度
+    name = readreadUTFBytes(size)   名称
+    mat  = readBytes(3 * 4 * 4)     3列4行矩阵，一共12个元素，每个元素使用float类型
+    size = readInt()                SubMesh数量
+        count = readInt()           SubMesh顶点长度
+        readBytes(count * 3 * 4)    SubMesh顶点数据，顶点数据一定存在，每个顶点三个数据x,y,z，使用float类型
+        count = readInt()           SubMesh uv0长度
+        readBytes(count * 2 * 4)    SubMesh uv0数据，uv0数据不一定存在，每个顶点两个数据u,v，使用float类型
+        count = readInt()           SubMesh uv1长度
+        readBytes(count * 2 * 4)    SubMesh uv1数据，uv0数据不一定存在，每个顶点两个数据u,v，使用float类型
+        count = readInt()           SubMesh 法线长度
+        readBytes(count * 3 * 4)    SubMesh 法线数据，每个顶点三个数据x,y,z，使用float类型
+        count = readInt()           SubMesh 权重长度
+        readBytes(count * 4 * 4)    SubMesh 权重数据，每个顶点四个数据，使用float类型。权重为骨骼系统权重值
+        count = readInt()           SubMesh 骨骼索引长度
+        readBytes(count * 4 * 4)    SubMesh 骨骼索引数据，每个顶点四个数据，使用float类型。索引为骨骼系统骨骼索引。受限于寄存器数量，因此骨骼索引可以使用ushort存放，可以修改脚本相应位置以便减少文件体积
+        重复读取SubMesh直到读取完所有SubMesh
+    readBytes(6 * 4)                Mesh包围盒数据、一共6个，使用float类型
+
+
+Anim文件读取格式:
+    动画文件分为帧动画和骨骼动画。
+    小头、解压
+    type = readInt()
+    type为
+        0:帧动画
+            count = readInt()                                帧数
+            readBytes(count * 3 * 4 * 4)                     所有帧数矩阵数据，矩阵数据为3列4行，float类型
+        1:矩阵类型骨骼动画
+            count = readInt()                                SubMesh数量
+                frameNum = readInt()                         SubMesh帧数
+                boneNum  = readInt()                         SubMesh骨骼数量
+                readBytes(frameNum * boneNum * 3 * 4 * 4)    SubMesh骨骼动画数据，float类型。保存每一帧的所有骨骼当前帧的矩阵数据，矩阵数据为3列4行
+                重复读取SubMesh
+        2:四元数类型骨骼动画
+            count = readInt()                                SubMesh数量
+                frameNum = readInt()                         SubMesh帧数
+                boneNum  = readInt()                         SubMesh骨骼数量
+                readBytes(frameNum * boneNum * 2 * 4 * 4)    SubMesh骨骼动画数据，float类型。保存每一帧的所有骨骼当前的位移以及四元数数据，位移四个，四元数四个
+
+Camera文件读取格式:
+    小头、解压
+    size = readInt()            相机名称长度
+    readreadUTFBytes(size)      相机名称
+    readFloat()                 视口宽度
+    readFloat()                 视口高度
+    readFloat()                 相机Near
+    readFloat()                 相机Far
+    readFloat()                 相机fieldOfView
+    readBytes(3 * 4 * 4)        相机矩阵，矩阵为3列四行，float类型
+    size = readInt()            相机动画帧数
+    readBytes(size * 3 * 4 * 4) 相机动画，相机动画使用3列四行矩阵，数据类型为float
+
+
+解析参数说明:
+    
+    -normal      解析法线，默认不解析
+    -uv0         解析UV0，默认不解析
+    -uv1         解析UV1，默认不解析
+    -anim        解析动画，默认不解析
+    -world       使用全局坐标，默认使用局部坐标
+    -path        指定Fbx文件路径，默认则扫描当前目录
+    -quat        使用四元数骨骼，默认则使用3列四行矩阵
+    -max_quat    设置四元数最大骨骼，默认上限为56，超过则拆分模型
+    -max_m34     设置矩阵最大骨骼，默认上限为36，超过则拆分模型
+    
 '''
 
 from FbxCommon import *
@@ -1258,8 +1328,9 @@ if __name__ == "__main__":
     config = parseArgument()
     fbxList = scanFbxFiles(config.path)
 #     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/yasuo.FBX"]
-    fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/nvhai.fbx"]
+#     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/nvhai.fbx"]
 #     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/ship/ship.fbx"]
+    fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/Test22.FBX"]
     
     for item in fbxList:
         parseFBX(item, config)
