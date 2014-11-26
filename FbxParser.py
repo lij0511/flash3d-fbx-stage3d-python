@@ -54,7 +54,7 @@ def parseArgument():
     # 指定Fbx文件路径
     parser.add_argument("-path",    help = "fbx file path  ",   action = "store",           default = "")
     # 使用四元数方式
-    parser.add_argument("-quat",    help = "quat with anima",   action = "store_true",      default = False)
+    parser.add_argument("-quat",    help = "quat with anima",   action = "store_true",      default = True)
     # 使用四元数时，最大骨骼数
     parser.add_argument("-max_quat",help = "bone num with quat",action = "store",           default = 56)
     # 使用矩阵时，最大骨骼数
@@ -179,6 +179,16 @@ def getMatrix3DBytes(fbxAMatrix):
             data += struct.pack('<f', raw[j])
             pass
         pass
+    return data
+    pass # end func
+
+# 生成Quat数据
+def getQuatBytesFromAMatrix(fbxAMatrix):
+    data = b''
+    t = fbxAMatrix.GetT()
+    q = fbxAMatrix.GetQ()
+    data += struct.pack('<ffff', t[0], t[1], t[2], 0)
+    data += struct.pack('<ffff', q[0], q[1], q[2], q[3])
     return data
     pass # end func
 
@@ -825,10 +835,15 @@ class Mesh(object):
                 pass # end
             count = len(subMesh.weightsAndIndices)
             data += struct.pack('<i', count)
+            
+            step = 3
+            if config.quat:
+                step = 2
+                pass
             # 写骨骼索引数据
             for i in range(count):
                 weIdx = subMesh.weightsAndIndices[i]
-                data += struct.pack('<ffff', weIdx[4] * 3, weIdx[5] * 3, weIdx[6] * 3, weIdx[7] * 3)
+                data += struct.pack('<ffff', weIdx[4] * step, weIdx[5] * step, weIdx[6] * step, weIdx[7] * step)
                 pass
             
             pass # end for
@@ -863,7 +878,11 @@ class Mesh(object):
     def generateSkeletonAnimBytes(self):
         data = b''
         # 类型
-        data += struct.pack('<i', 1)
+        t = 1
+        if config.quat:
+            t = 2
+            pass
+        data += struct.pack('<i', t)
         # 写入SubMe数量
         subNum= len(self.geometries)
         data += struct.pack('<i', subNum)
@@ -879,7 +898,12 @@ class Mesh(object):
             for i in range(count):
                 clip = subMesh.anims[i]
                 for j in range(len(clip)):
-                    data+= getMatrix3DBytes(clip[j])
+                    if config.quat:
+                        data += getQuatBytesFromAMatrix(clip[j])
+                        pass
+                    else:
+                        data += getMatrix3DBytes(clip[j])
+                        pass
                     pass # end for
                 pass # end for
             pass
@@ -1233,12 +1257,9 @@ if __name__ == "__main__":
     # 解析参数
     config = parseArgument()
     fbxList = scanFbxFiles(config.path)
-<<<<<<< HEAD
 #     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/yasuo.FBX"]
-#     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/nvhai.fbx"]
+    fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/nvhai.fbx"]
 #     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/ship/ship.fbx"]
-=======
->>>>>>> FETCH_HEAD
     
     for item in fbxList:
         parseFBX(item, config)
