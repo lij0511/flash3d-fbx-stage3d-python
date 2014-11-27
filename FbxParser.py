@@ -109,7 +109,7 @@ config = LObject()
 def parseArgument():
 
     print("parse arguments...")
-
+    
     parser = argparse.ArgumentParser()
     # 解析法线
     parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = False)
@@ -621,6 +621,17 @@ class Mesh(object):
                 pass # end for
             self.uvs0 = uvs
             print("\tUV0 num:%d" % (len(self.uvs0)))
+            # 重构uv0索引顺序
+            count = len(self.uvs0)
+            count = count / 3
+            for i in range(count):
+                v0 = self.uvs0[i * 3 + 0]
+                v1 = self.uvs0[i * 3 + 1]
+                v2 = self.uvs0[i * 3 + 2]
+                self.uvs0[i * 3 + 0] = v0
+                self.uvs0[i * 3 + 1] = v2
+                self.uvs0[i * 3 + 2] = v1
+                pass # end for
             pass # end if
         pass # end func
     
@@ -646,6 +657,17 @@ class Mesh(object):
                 pass # end for
             self.uvs1 = uvs
             print("\tUV1 num:%d" % (len(self.uvs1)))
+            # 重构uv1索引顺序
+            count = len(self.uvs1)
+            count = count / 3
+            for i in range(count):
+                v0 = self.uvs1[i * 3 + 0]
+                v1 = self.uvs1[i * 3 + 1]
+                v2 = self.uvs1[i * 3 + 2]
+                self.uvs1[i * 3 + 0] = v0
+                self.uvs1[i * 3 + 1] = v2
+                self.uvs1[i * 3 + 2] = v1
+                pass # end for
             pass # end if
         pass # end func
     
@@ -879,7 +901,7 @@ class Mesh(object):
             count = len(subMesh.uvs0)                      
             data += struct.pack('<i', count)
             for i in range(count):
-                uv = subMesh.uvs0[0]
+                uv = subMesh.uvs0[i]
                 data += struct.pack('<ff', uv[0], uv[1])
                 pass # end for
             # 写UV1
@@ -1327,7 +1349,7 @@ if __name__ == "__main__":
     # 解析参数
     config = parseArgument()
     fbxList = scanFbxFiles(config.path)
-    
+        
     for item in fbxList:
         parseFBX(item, config)
         pass
