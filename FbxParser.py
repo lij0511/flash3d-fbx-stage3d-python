@@ -92,9 +92,9 @@ class LObject(object):
     pass # end class
 
 # 文件类型
-MESH_TYPE   = ".mesh"
-ANIM_TYPE   = ".anim"
-CAMERA_TYPE = ".camera"
+MESH_TYPE   = u".mesh"
+ANIM_TYPE   = u".anim"
+CAMERA_TYPE = u".camera"
 # 翻转
 AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(-90, 180, 0), FbxVector4(-1, 1, 1))
 AXIS_FLIP_X = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
@@ -112,15 +112,15 @@ def parseArgument():
     
     parser = argparse.ArgumentParser()
     # 解析法线
-    parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = False)
+    parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = True)
     # 解析UV0
-    parser.add_argument("-uv0",     help = "parse uv0",         action = "store_true",      default = False)
+    parser.add_argument("-uv0",     help = "parse uv0",         action = "store_true",      default = True)
     # 解析UV1
-    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = False)
+    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = True)
     # 解析动画
-    parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = False)
+    parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = True)
     # 使用全局坐标
-    parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = False)
+    parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = True)
     # 指定Fbx文件路径
     parser.add_argument("-path",    help = "fbx file path  ",   action = "store",           default = "")
     # 使用四元数方式
@@ -871,7 +871,7 @@ class Mesh(object):
         fbxName = fbxName.split(".")[0:-1]
         fbxName = ".".join(fbxName)
         fbxDir  = parseFilepath(self.fbxFilePath)
-        self.meshFileName = fbxDir + fbxName + "_" + self.name + MESH_TYPE
+        self.meshFileName = fbxDir + fbxName + "_" + unicode(self.name,"utf-8") + MESH_TYPE
         # 组织Mesh数据
         data = b''
         # 写名称
@@ -1010,7 +1010,7 @@ class Mesh(object):
         fbxName = fbxName.split(".")[0:-1]
         fbxName = ".".join(fbxName)
         fbxDir  = parseFilepath(self.fbxFilePath)
-        self.animFileName = fbxDir + fbxName + "_" + self.name + ANIM_TYPE
+        self.animFileName = fbxDir + fbxName + "_" + unicode(self.name,"utf-8") + ANIM_TYPE
         # 动画类型:0->帧动画;1->矩阵骨骼动画;2->四元数骨骼动画
         data = None
         if self.skeleton:
@@ -1349,9 +1349,13 @@ if __name__ == "__main__":
     # 解析参数
     config = parseArgument()
     fbxList = scanFbxFiles(config.path)
-        
+#     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/yasuo.FBX"]
+#     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/nvhai.fbx"]
+#     fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/ship/ship.fbx"]
+    fbxList = ["/Users/Neil/python/ImportSceneSDK2015/test/Test22.FBX"]
+    
     for item in fbxList:
-        parseFBX(item, config)
+        parseFBX(unicode(item, "utf-8"), config)
         pass
     
     pass
