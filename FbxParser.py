@@ -92,9 +92,10 @@ class LObject(object):
     pass # end class
 
 # 文件类型
-MESH_TYPE   = u".mesh"
-ANIM_TYPE   = u".anim"
-CAMERA_TYPE = u".camera"
+MESH_TYPE   = ".mesh"
+ANIM_TYPE   = ".anim"
+CAMERA_TYPE = ".camera"
+SCENE_TYPE  = ".scene"
 # 翻转
 AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(-90, 180, 0), FbxVector4(-1, 1, 1))
 AXIS_FLIP_X = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
@@ -159,7 +160,7 @@ def scanFbxFiles(args):
             for fileName in fileNames:
                 if fileName.endswith('FBX') or fileName.endswith('fbx'):
                     filePath = os.path.join(parentDir, fileName)
-                    fbxList.append(filePath)
+                    fbxList.append(str(filePath))
                     pass
                 pass
         pass
@@ -288,6 +289,7 @@ class Camera3D(object):
     def __init__(self):
         super(Camera3D, self).__init__()
         self.fbxCamera          = None  # 相机
+        self.name               = None  # 相机名称
         self.scene              = None  # scene
         self.sdkManager         = None  # sdkMangaer
         self.fbxFilePath        = None  # filepath
@@ -403,7 +405,7 @@ class Camera3D(object):
         self.invAxisTransform = FbxAMatrix(self.axisTransform)
         self.invAxisTransform.Inverse()
         # 相机名称
-        self.name = str(fbxCamera.GetName())
+        self.name = unicode(str(fbxCamera.GetNode().GetName()), "utf-8")
         print("\t%s" % self.name)
         # 解析相机属性
         self.parseCameraProperties()
@@ -449,10 +451,48 @@ class Scene3D(object):
     def __init__(self):
         super(Scene3D, self).__init__()
         self.cameras = [] # 相机列表
-        self.meshs   = [] # 模型列表
+        self.meshes  = [] # 模型列表
+        self.lights  = [] # 灯光列表
         pass # end func
     
     pass # end class
+
+# 材质
+# 只会解析最基础的材质
+class Material(object):
+    
+    def __init__(self):
+        super(Material, self).__init__()
+        
+        self.material       = None  # 材质
+        self.name           = None  # 材质名称
+        self.textureName    = ""    # 贴图名称
+        
+        pass # end func
+    
+    # 初始化
+    def initWithFbxMaterial(self, material):
+        self.material = material
+        self.name     = self.material.GetName() 
+        for i in range(FbxLayerElement.sTypeTextureCount()):
+            prop = self.material.FindProperty(FbxLayerElement.sTextureChannelNames(i))
+            if prop.GetName() != "DiffuseColor":
+                continue;
+                pass
+            count = prop.GetSrcObjectCount(FbxTexture.ClassId)
+            for j in range(count):
+                texture = prop.GetSrcObject(FbxTexture.ClassId, j)
+                self.textureName = unicode(str(texture.GetFileName()), "utf-8")
+                pass
+            pass
+        # 解析文件名
+        if not self.textureName:
+            return
+        # 获取文件名
+        self.textureName = re.compile("[\\\/]").split(self.textureName)[-1]
+        pass # end func
+    
+    pass
 
 # 模型
 class Mesh(object):
@@ -465,6 +505,7 @@ class Mesh(object):
         self.fbxFilePath        = None          # Fbx文件路径
         self.name               = None          # 模型名称
         self.skeleton           = False         # 是否为骨骼模型
+        self.transform          = None          # transform
         self.geometryTransform  = None          # geometry矩阵
         self.axisTransform      = None          # 坐标系矩阵
         self.invAxisTransform   = None          # 坐标系逆矩阵
@@ -487,6 +528,7 @@ class Mesh(object):
         self.bounds.min         = [0, 0, 0]     # min
         self.bounds.max         = [0, 0, 0]     # max
         self.geometries         = []            # sub geometry
+        self.material           = None          # 材质
         
         pass #end func
     
@@ -498,17 +540,19 @@ class Mesh(object):
         self.invGeometryTrans   = FbxAMatrix(self.geometryTransform)
         self.invGeometryTrans   = self.invGeometryTrans.Inverse()
         
-        localTransform = self.fbxMesh.GetNode().EvaluateLocalTransform()
-        globalTransform= self.fbxMesh.GetNode().EvaluateGlobalTransform()
-        
-        printFBXAMatrix("\tGeomtryMatrix:", self.geometryTransform)
-        printFBXAMatrix("\tLocal  Matrix:", localTransform)
-        printFBXAMatrix("\tGlobal Matrix:", globalTransform)
-        
         self.axisTransform    = AXIS_FLIP_L * self.geometryTransform
         self.invAxisTransform = FbxAMatrix(self.axisTransform)
         self.invAxisTransform = self.invAxisTransform.Inverse()
+            
+        if config.world:
+            self.transform = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform
+            pass
+        else:
+            self.transform = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+            pass
         
+        printFBXAMatrix("\tGlobal Matrix:", self.transform)
+            
         pass # end func
     
     # 解析索引
@@ -871,19 +915,14 @@ class Mesh(object):
         fbxName = fbxName.split(".")[0:-1]
         fbxName = ".".join(fbxName)
         fbxDir  = parseFilepath(self.fbxFilePath)
-        self.meshFileName = fbxDir + fbxName + "_" + unicode(self.name,"utf-8") + MESH_TYPE
+        self.meshFileName = fbxDir + fbxName + "_" + unicode(self.name, "utf-8") + MESH_TYPE
         # 组织Mesh数据
         data = b''
         # 写名称
         data += struct.pack('<i', len(self.name)) 
         data += str(self.name)
         # 写坐标
-        if config.world:
-            data += getMatrix3DBytes(AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform)
-            pass
-        else:
-            data += getMatrix3DBytes(AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform)
-            pass
+        data += getMatrix3DBytes(self.transform)
         # 写SubMesh数量
         subNum = len(self.geometries)
         data  += struct.pack("<i", subNum)
@@ -1010,7 +1049,7 @@ class Mesh(object):
         fbxName = fbxName.split(".")[0:-1]
         fbxName = ".".join(fbxName)
         fbxDir  = parseFilepath(self.fbxFilePath)
-        self.animFileName = fbxDir + fbxName + "_" + unicode(self.name,"utf-8") + ANIM_TYPE
+        self.animFileName = fbxDir + fbxName + "_" + unicode(self.name, "utf-8") + ANIM_TYPE
         # 动画类型:0->帧动画;1->矩阵骨骼动画;2->四元数骨骼动画
         data = None
         if self.skeleton:
@@ -1061,6 +1100,8 @@ class Mesh(object):
             subMesh.geometryTransform   = self.geometryTransform
             subMesh.axisTransform       = self.axisTransform
             subMesh.invAxisTransform    = self.invAxisTransform
+            subMesh.material            = self.material
+            subMesh.transform           = self.transform
             # 拆分数据
             # 顶点
             subMesh.vertices            = self.vertices[idx : idx + MAX_VERTEX_NUM]
@@ -1181,6 +1222,8 @@ class Mesh(object):
             subMesh.geometryTransform   = self.geometryTransform
             subMesh.axisTransform       = self.axisTransform
             subMesh.invAxisTransform    = self.invAxisTransform
+            subMesh.material            = self.material
+            subMesh.transform           = self.transform
             # 重构骨骼索引
             joints  = []
             oldIndexMap = {}
@@ -1241,6 +1284,17 @@ class Mesh(object):
         return False
         pass # end func
     
+    # 解析材质，只解析第一层材质
+    def parseMaterial(self):
+        print("\tparse materials...")
+        count = self.fbxMesh.GetNode().GetMaterialCount()
+        if count == 0:
+            return
+        self.material = Material()
+        self.material.initWithFbxMaterial(self.fbxMesh.GetNode().GetMaterial(0))
+        print("\ttexture:%s" % self.material.textureName)
+        pass
+    
     # 初始化mesh
     def initWithFbxMesh(self, fbxMesh, sdkManager, scene, fbxFilePath):
         
@@ -1271,6 +1325,8 @@ class Mesh(object):
         # 解析动画
         if config.anim:
             self.parseAnim()
+        # 解析材质
+        self.parseMaterial()
         # 拆分Mesh
         self.splitMesh() 
         # 生成模型数据
@@ -1285,8 +1341,6 @@ class Mesh(object):
         
         pass
         
-    
-
     pass # end class
 
 # 解析相机
@@ -1305,19 +1359,74 @@ def parseCameras(sdkManager, scene, filepath):
     pass # end func
 
 # 解析所有的模型
-def parseMeshs(sdkManager, scene, filepath):
-    print("parse meshs...")
+def parseMeshes(sdkManager, scene, filepath):
+    print("parse meshes...")
     count = scene.GetSrcObjectCount(FbxMesh.ClassId)
     print("\tmesh num:%d" % (count))
-    meshs = []
+    meshes = []
     for i in range(count):
         fbxMesh = scene.GetSrcObject(FbxMesh.ClassId, i)
         mesh = Mesh()
         mesh.initWithFbxMesh(fbxMesh, sdkManager, scene, filepath)
-        meshs.append(mesh)
+        meshes.append(mesh)
         pass # end for
-
+    return meshes
     pass # end func
+
+# 获取模型配置
+def getMeshConfig(mesh):
+    
+    meshName = re.compile("[\\\/]").split(mesh.meshFileName)[-1] 
+    animName = re.compile("[\\\/]").split(mesh.animFileName)[-1]
+    
+    obj = {}
+    # 模型名称
+    obj["name"]         = meshName
+    # 是否为骨骼模型
+    obj["skeleton"]     = mesh.skeleton
+    # 坐标点
+    obj["transform"]    = Matrix3D(mesh.transform).rawData
+    # 材质名称
+    if mesh.material:
+        obj["texture"]  = mesh.material.textureName
+        pass
+    # 动画
+    anim                = {}
+    obj["anim"]         = anim
+    anim["name"]        = animName
+    # 动画帧数
+    anim["totalFrames"] = len(mesh.anims)
+    return obj
+    pass # end func
+
+# 写场景配置
+def writeSceneConfig(scene):
+    obj = {}
+    # 写相机
+    obj["cameras"] = []
+    obj["meshes"]  = []
+    for i in range(len(scene.cameras)):
+        fileName = scene.cameras[i].fileName
+        fileName = re.compile("[\\\/]").split(fileName)[-1]
+        obj["cameras"].append(fileName)
+        pass
+    # 写模型
+    for i in range(len(scene.meshes)):
+        obj["meshes"].append(getMeshConfig(scene.meshes[i]))
+        pass
+    data = json.dumps(obj, sort_keys=True, indent=4)
+    data = unicode(str(data), "utf-8")
+    
+    tokens  = re.compile("[\\\/]").split(scene.fbxfile)
+    fbxName = tokens[-1]
+    fbxName = fbxName.split(".")[0:-1]
+    fbxName = ".".join(fbxName)
+    fbxDir  = parseFilepath(scene.fbxfile)
+    fileName = fbxDir + fbxName + SCENE_TYPE
+    
+    open(fileName, 'w').write(data)
+    
+    pass
 
 # 解析FBX文件
 def parseFBX(fbxfile, config):
@@ -1337,10 +1446,16 @@ def parseFBX(fbxfile, config):
     converter.Triangulate(scene, True)
     axisSystem = FbxAxisSystem.OpenGL
     axisSystem.ConvertScene(scene)
+    
+    # 开始解析fbx
+    scene3d = Scene3D()
+    scene3d.fbxfile = fbxfile
     # 解析相机
-    parseCameras(sdkManager, scene, fbxfile)
+    scene3d.cameras = parseCameras(sdkManager, scene, fbxfile)
     # 解析模型
-    parseMeshs(sdkManager,   scene, fbxfile)
+    scene3d.meshes  = parseMeshes(sdkManager, scene, fbxfile)
+    # 写场景配置
+    writeSceneConfig(scene3d)
     
     pass # end func
 
