@@ -1,4 +1,4 @@
-package {
+package core.loader {
 
 	import flash.events.Event;
 	import flash.net.URLLoader;
@@ -9,6 +9,7 @@ package {
 	import core.base.Geometry3D;
 	import core.base.Mesh3D;
 	import core.base.Pivot3D;
+	import core.render.SkeletonRender;
 	import core.shader.Shader3D;
 	import core.shader.filter.ColorFilter;
 	import core.shader.filter.SkeletonFilter34;
@@ -104,6 +105,8 @@ package {
 						geo.shader.addFilter(new SkeletonFilter34());						
 					}
 				}
+				
+				this.dispatchEvent(new MeshEvent(mesh));
 			}
 			
 		}

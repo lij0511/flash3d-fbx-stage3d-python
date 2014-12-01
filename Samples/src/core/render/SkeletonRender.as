@@ -1,8 +1,7 @@
-package {
+package core.render {
 
 	import core.base.Geometry3D;
 	import core.base.Mesh3D;
-	import core.render.DefaultRender;
 	import core.shader.Shader3D;
 	import core.utils.Device3D;
 

@@ -1,4 +1,4 @@
-package {
+package core.loader {
 
 	import flash.events.Event;
 	import flash.events.EventDispatcher;

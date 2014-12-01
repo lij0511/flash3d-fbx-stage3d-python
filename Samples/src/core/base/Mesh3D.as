@@ -4,6 +4,7 @@
 	
 	import core.render.DefaultRender;
 	import core.render.FrameRender;
+	import core.render.SkeletonRender;
 	import core.scene.Scene3D;
 	import core.shader.Shader3D;
 	import core.utils.Device3D;
@@ -104,6 +105,19 @@
 			for each (var geo : Geometry3D in this.geometries) {
 				geo.download();
 			}
+		}
+		
+		public function clone() : Mesh3D {
+			var mesh : Mesh3D = new Mesh3D();
+			
+			for each (var geo : Geometry3D in this.geometries) {
+				mesh.geometries.push(geo);
+			}
+			mesh.transform.copyFrom(this.transform);
+			mesh.render = render;
+			mesh.frames = frames;
+			
+			return mesh;
 		}
 		
 		/**
