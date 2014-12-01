@@ -97,7 +97,7 @@ ANIM_TYPE   = ".anim"
 CAMERA_TYPE = ".camera"
 SCENE_TYPE  = ".scene"
 # 翻转
-AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
+AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(0, 180, 0), FbxVector4(-1, 1, 1))
 # 最大权重数量
 MAX_WEIGHT_NUM = 4
 # 最大顶点数
@@ -861,7 +861,6 @@ class Mesh(object):
     def parseFrameAnim(self, time):
         # 顶点 * axis * [axis的逆矩阵 * global * axis]
         animMt = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
-        print(animMt.GetS())
         matrix = Matrix3D(animMt)
         clip   = []
         # 丢弃最后一列数据
@@ -1446,8 +1445,8 @@ def parseFBX(fbxfile, config):
     # 对场景三角化
     converter = FbxGeometryConverter(sdkManager)
     converter.Triangulate(scene, True)
-    axisSystem = FbxAxisSystem.OpenGL
-    axisSystem.ConvertScene(scene)
+#     axisSystem = FbxAxisSystem.OpenGL
+#     axisSystem.ConvertScene(scene)
     
     # 开始解析fbx
     scene3d = Scene3D()

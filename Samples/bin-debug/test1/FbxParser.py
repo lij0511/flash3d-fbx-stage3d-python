@@ -83,7 +83,6 @@ import os
 import re
 import struct
 import zlib
-from matplotlib.pyplot import bone
 
 # object
 class LObject(object):
@@ -98,8 +97,7 @@ ANIM_TYPE   = ".anim"
 CAMERA_TYPE = ".camera"
 SCENE_TYPE  = ".scene"
 # 翻转
-AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
-AXIS_FLIP_X = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
+AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(0, 180, 0), FbxVector4(-1, 1, 1))
 # 最大权重数量
 MAX_WEIGHT_NUM = 4
 # 最大顶点数
@@ -131,8 +129,6 @@ def parseArgument():
     parser.add_argument("-max_quat",help = "bone num with quat",action = "store",           default = 56)
     # 使用矩阵时，最大骨骼数
     parser.add_argument("-max_m34", help = "bone num with m34", action = "store",           default = 36)
-    # 绑定点
-    parser.add_argument("-mount",   help = "joints of attach",  action = "store",           default = "_$weapon_r _$weapon_l")
     
     option = parser.parse_args()
     
@@ -335,7 +331,7 @@ class Camera3D(object):
         frameTime.SetTime(0, 0, 0, 1, 0, self.scene.GetGlobalSettings().GetTimeMode())
         # 解析每一帧动画
         while time <= timeSpan.GetStop():
-            animMt = AXIS_FLIP_X * self.fbxCamera.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
+            animMt = AXIS_FLIP_L * self.fbxCamera.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
             matrix = Matrix3D(animMt)
             clip   = []
             # 丢弃最后一列数据
@@ -371,7 +367,7 @@ class Camera3D(object):
         self.bytes += struct.pack('<f', self.far)               # far
         self.bytes += struct.pack('<f', self.fieldOfView)       # fieldOfView
         # 保存相机当前位置
-        animMt = AXIS_FLIP_X * self.fbxCamera.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+        animMt = AXIS_FLIP_L * self.fbxCamera.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
         matrix = Matrix3D(animMt)
         # 丢弃最后一列数据
         for i in range(3):
@@ -404,7 +400,7 @@ class Camera3D(object):
         self.scene       = scene
         self.fbxFilePath = filepath
         # axis
-        self.axisTransform    = AXIS_FLIP_X
+        self.axisTransform    = AXIS_FLIP_L
         self.invAxisTransform = FbxAMatrix(self.axisTransform)
         self.invAxisTransform.Inverse()
         # 相机名称
@@ -518,7 +514,6 @@ class Mesh(object):
         self.normals            = []            # 法线
         self.weightsAndIndices  = []            # 权重以及索引
         self.bounds             = LObject()     # 包围盒
-        self.mounts             = []            # 挂节点
         self.anims              = []            # 动画|如果为骨骼模型，那么保存骨骼数据，否则就保存帧Transform数据
         self.verticesIndices    = []            # 顶点索引
         self.uvIndices          = []            # uv索引
@@ -544,15 +539,17 @@ class Mesh(object):
         self.invGeometryTrans   = FbxAMatrix(self.geometryTransform)
         self.invGeometryTrans   = self.invGeometryTrans.Inverse()
         
+        printFBXAMatrix("\tGeometry Matrix:", self.geometryTransform)
+        
         self.axisTransform    = AXIS_FLIP_L * self.geometryTransform
         self.invAxisTransform = FbxAMatrix(self.axisTransform)
         self.invAxisTransform = self.invAxisTransform.Inverse()
             
         if config.world:
-            self.transform = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform
+            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform
             pass
         else:
-            self.transform = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
             pass
         
         printFBXAMatrix("\tGlobal Matrix:", self.transform)
@@ -850,33 +847,20 @@ class Mesh(object):
         return vertexTransform
         pass
     
-    
     # 解析骨骼动画
     def parseSkeletonAnim(self, time):
         clip  = []
-        mounts= []
         count = len(self.joints)
-        # 骨骼动画
         for i in range(count):
             clip.append(self.parseJointFrameAnim(self.joints[i], time))
             pass # end func
-        # 挂节点
-        units = ["_$ R Hand", "_$ L Hand"]
-        count = self.scene.GetSrcObjectCount(FbxSkeleton.ClassId)
-        for i in range(count):
-            bone = self.scene.GetSrcObject(FbxSkeleton.ClassId, i)
-            if bone.GetNode().GetName() in units:
-                # TODO
-                pass
-            pass
-        self.mounts.append(mounts)
         self.anims.append(clip)
         pass
     
     # 解析帧动画
     def parseFrameAnim(self, time):
         # 顶点 * axis * [axis的逆矩阵 * global * axis]
-        animMt = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
+        animMt = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
         matrix = Matrix3D(animMt)
         clip   = []
         # 丢弃最后一列数据
@@ -1461,8 +1445,8 @@ def parseFBX(fbxfile, config):
     # 对场景三角化
     converter = FbxGeometryConverter(sdkManager)
     converter.Triangulate(scene, True)
-    axisSystem = FbxAxisSystem.OpenGL
-    axisSystem.ConvertScene(scene)
+#     axisSystem = FbxAxisSystem.OpenGL
+#     axisSystem.ConvertScene(scene)
     
     # 开始解析fbx
     scene3d = Scene3D()

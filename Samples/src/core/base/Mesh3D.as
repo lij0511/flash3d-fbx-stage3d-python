@@ -113,7 +113,6 @@
 			for each (var geo : Geometry3D in this.geometries) {
 				mesh.geometries.push(geo);
 			}
-			mesh.transform.copyFrom(this.transform);
 			mesh.render = render;
 			mesh.frames = frames;
 			
