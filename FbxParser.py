@@ -98,7 +98,6 @@ CAMERA_TYPE = ".camera"
 SCENE_TYPE  = ".scene"
 # 翻转
 AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
-AXIS_FLIP_X = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
 # 最大权重数量
 MAX_WEIGHT_NUM = 4
 # 最大顶点数
@@ -113,19 +112,19 @@ def parseArgument():
     
     parser = argparse.ArgumentParser()
     # 解析法线
-    parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = False)
+    parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = True)
     # 解析UV0
-    parser.add_argument("-uv0",     help = "parse uv0",         action = "store_true",      default = False)
+    parser.add_argument("-uv0",     help = "parse uv0",         action = "store_true",      default = True)
     # 解析UV1
-    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = False)
+    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = True)
     # 解析动画
-    parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = False)
+    parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = True)
     # 使用全局坐标
-    parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = False)
+    parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = True)
     # 指定Fbx文件路径
     parser.add_argument("-path",    help = "fbx file path  ",   action = "store",           default = "")
     # 使用四元数方式
-    parser.add_argument("-quat",    help = "quat with anima",   action = "store_true",      default = False)
+    parser.add_argument("-quat",    help = "quat with anima",   action = "store_true",      default = True)
     # 使用四元数时，最大骨骼数
     parser.add_argument("-max_quat",help = "bone num with quat",action = "store",           default = 56)
     # 使用矩阵时，最大骨骼数
@@ -332,7 +331,7 @@ class Camera3D(object):
         frameTime.SetTime(0, 0, 0, 1, 0, self.scene.GetGlobalSettings().GetTimeMode())
         # 解析每一帧动画
         while time <= timeSpan.GetStop():
-            animMt = AXIS_FLIP_X * self.fbxCamera.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
+            animMt = AXIS_FLIP_L * self.fbxCamera.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
             matrix = Matrix3D(animMt)
             clip   = []
             # 丢弃最后一列数据
@@ -368,7 +367,7 @@ class Camera3D(object):
         self.bytes += struct.pack('<f', self.far)               # far
         self.bytes += struct.pack('<f', self.fieldOfView)       # fieldOfView
         # 保存相机当前位置
-        animMt = AXIS_FLIP_X * self.fbxCamera.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+        animMt = AXIS_FLIP_L * self.fbxCamera.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
         matrix = Matrix3D(animMt)
         # 丢弃最后一列数据
         for i in range(3):
@@ -401,7 +400,7 @@ class Camera3D(object):
         self.scene       = scene
         self.fbxFilePath = filepath
         # axis
-        self.axisTransform    = AXIS_FLIP_X
+        self.axisTransform    = AXIS_FLIP_L
         self.invAxisTransform = FbxAMatrix(self.axisTransform)
         self.invAxisTransform.Inverse()
         # 相机名称
@@ -540,15 +539,17 @@ class Mesh(object):
         self.invGeometryTrans   = FbxAMatrix(self.geometryTransform)
         self.invGeometryTrans   = self.invGeometryTrans.Inverse()
         
+        printFBXAMatrix("\tGeometry Matrix:", self.geometryTransform)
+        
         self.axisTransform    = AXIS_FLIP_L * self.geometryTransform
         self.invAxisTransform = FbxAMatrix(self.axisTransform)
         self.invAxisTransform = self.invAxisTransform.Inverse()
             
         if config.world:
-            self.transform = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform
+            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform
             pass
         else:
-            self.transform = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
             pass
         
         printFBXAMatrix("\tGlobal Matrix:", self.transform)
@@ -859,7 +860,8 @@ class Mesh(object):
     # 解析帧动画
     def parseFrameAnim(self, time):
         # 顶点 * axis * [axis的逆矩阵 * global * axis]
-        animMt = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
+        animMt = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
+        print(animMt.GetS())
         matrix = Matrix3D(animMt)
         clip   = []
         # 丢弃最后一列数据
