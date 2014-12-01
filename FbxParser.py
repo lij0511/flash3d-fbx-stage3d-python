@@ -116,7 +116,7 @@ def parseArgument():
     # 解析UV0
     parser.add_argument("-uv0",     help = "parse uv0",         action = "store_true",      default = True)
     # 解析UV1
-    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = True)
+    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = False)
     # 解析动画
     parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = True)
     # 使用全局坐标
@@ -539,21 +539,22 @@ class Mesh(object):
         self.invGeometryTrans   = FbxAMatrix(self.geometryTransform)
         self.invGeometryTrans   = self.invGeometryTrans.Inverse()
         
-        printFBXAMatrix("\tGeometry Matrix:", self.geometryTransform)
-        
-        self.axisTransform    = AXIS_FLIP_L * self.geometryTransform
-        self.invAxisTransform = FbxAMatrix(self.axisTransform)
-        self.invAxisTransform = self.invAxisTransform.Inverse()
-            
         if config.world:
-            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform
+            self.axisTransform  = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.geometryTransform
+            self.invAxisTransform = FbxAMatrix(self.axisTransform)
+            self.invAxisTransform = self.invAxisTransform.Inverse()
+            self.transform      = FbxAMatrix()
             pass
         else:
-            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+            self.axisTransform  = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateLocalTransform()  * self.geometryTransform
+            self.invAxisTransform = FbxAMatrix(self.axisTransform)
+            self.invAxisTransform = self.invAxisTransform.Inverse()
+            self.transform      = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform()  * self.invAxisTransform
             pass
         
-        printFBXAMatrix("\tGlobal Matrix:", self.transform)
-            
+        printFBXAMatrix("\tGeometry Matrix:", self.geometryTransform);
+        printFBXAMatrix("\tTransform Matrix:", self.transform)
+        
         pass # end func
     
     # 解析索引
@@ -861,6 +862,7 @@ class Mesh(object):
     def parseFrameAnim(self, time):
         # 顶点 * axis * [axis的逆矩阵 * global * axis]
         animMt = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
+#         print(animMt.GetS())
         matrix = Matrix3D(animMt)
         clip   = []
         # 丢弃最后一列数据
@@ -1445,8 +1447,8 @@ def parseFBX(fbxfile, config):
     # 对场景三角化
     converter = FbxGeometryConverter(sdkManager)
     converter.Triangulate(scene, True)
-#     axisSystem = FbxAxisSystem.OpenGL
-#     axisSystem.ConvertScene(scene)
+    axisSystem = FbxAxisSystem.OpenGL
+    axisSystem.ConvertScene(scene)
     
     # 开始解析fbx
     scene3d = Scene3D()
