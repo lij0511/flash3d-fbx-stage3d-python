@@ -83,6 +83,7 @@ import os
 import re
 import struct
 import zlib
+import sys
 
 # object
 class LObject(object):
@@ -404,7 +405,7 @@ class Camera3D(object):
         self.invAxisTransform = FbxAMatrix(self.axisTransform)
         self.invAxisTransform.Inverse()
         # 相机名称
-        self.name = unicode(str(fbxCamera.GetNode().GetName()), "utf-8")
+        self.name = str(fbxCamera.GetNode().GetName())
         print("\t%s" % self.name)
         # 解析相机属性
         self.parseCameraProperties()
@@ -481,7 +482,7 @@ class Material(object):
             count = prop.GetSrcObjectCount(FbxTexture.ClassId)
             for j in range(count):
                 texture = prop.GetSrcObject(FbxTexture.ClassId, j)
-                self.textureName = unicode(str(texture.GetFileName()), "utf-8")
+                self.textureName = str(texture.GetFileName())
                 pass
             pass
         # 解析文件名
@@ -918,7 +919,7 @@ class Mesh(object):
         fbxName = fbxName.split(".")[0:-1]
         fbxName = ".".join(fbxName)
         fbxDir  = parseFilepath(self.fbxFilePath)
-        self.meshFileName = fbxDir + fbxName + "_" + unicode(self.name, "utf-8") + MESH_TYPE
+        self.meshFileName = fbxDir + fbxName + "_" + self.name + MESH_TYPE
         # 组织Mesh数据
         data = b''
         # 写名称
@@ -1052,7 +1053,7 @@ class Mesh(object):
         fbxName = fbxName.split(".")[0:-1]
         fbxName = ".".join(fbxName)
         fbxDir  = parseFilepath(self.fbxFilePath)
-        self.animFileName = fbxDir + fbxName + "_" + unicode(self.name, "utf-8") + ANIM_TYPE
+        self.animFileName = fbxDir + fbxName + "_" + self.name + ANIM_TYPE
         # 动画类型:0->帧动画;1->矩阵骨骼动画;2->四元数骨骼动画
         data = None
         if self.skeleton:
@@ -1418,7 +1419,7 @@ def writeSceneConfig(scene):
         obj["meshes"].append(getMeshConfig(scene.meshes[i]))
         pass
     data = json.dumps(obj, sort_keys=True, indent=4)
-    data = unicode(str(data), "utf-8")
+    data = str(data)
     
     tokens  = re.compile("[\\\/]").split(scene.fbxfile)
     fbxName = tokens[-1]
@@ -1463,13 +1464,16 @@ def parseFBX(fbxfile, config):
     pass # end func
 
 if __name__ == "__main__":
+
+    reload(sys)
+    sys.setdefaultencoding('utf8')
     
     # 解析参数
     config = parseArgument()
     fbxList = scanFbxFiles(config.path)
     
     for item in fbxList:
-        parseFBX(unicode(item, "utf-8"), config)
+        parseFBX(item, config)
         pass
     
     pass
