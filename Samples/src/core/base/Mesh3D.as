@@ -1,7 +1,5 @@
 ﻿package core.base {
 
-	import flash.geom.Vector3D;
-	
 	import core.render.DefaultRender;
 	import core.render.FrameRender;
 	import core.render.SkeletonRender;
@@ -15,35 +13,18 @@
 	 */
 	public class Mesh3D extends Pivot3D {
 
-		private static const CLICK 		: int = 1 << 6;
-		private static const MOUSE_DOWN 	: int = 1 << 7;
-		private static const MOUSE_MOVE 	: int = 1 << 8;
-		private static const MOUSE_OUT 	: int = 1 << 9;
-		private static const MOUSE_OVER 	: int = 1 << 10;
-		private static const MOUSE_UP 	: int = 1 << 11;
-		private static const MOUSE_WHELL	: int = 1 << 12;
-		
 		private static var refaultRender	: DefaultRender = new DefaultRender();
-		private static var boundsScale	: Vector3D = new Vector3D();
-		private static var boundsCenter	: Vector3D = new Vector3D();
-		private static var boundsRawData	: Vector.<Number> = new Vector.<Number>(16, true);
 		
 		public var geometries			: Vector.<Geometry3D>;		// 子mesh
 		public var mouseEnabled			: Boolean = true;			// 启用鼠标
 		
 		protected var _render 			: DefaultRender;				// 渲染器
 		protected var _bounds 			: Bounds3D;					// bounds
-		protected var _inViewAlways 		: Boolean = false;			// 总是显示
 		
-		private var _inView 				: Boolean = false;			// inview
-		private var _boundsCenter 		: Vector3D;					// 包围盒中心点
-		private var _boundsRadius 		: Number = 1;				// 包围盒半径
-		private var _updateBoundsScale 	: Boolean = true;			// 是否更新包围盒
 		
 		public function Mesh3D(name : String = "") {
 			super(name);
 			this.geometries		= new Vector.<Geometry3D>();
-			this._boundsCenter 	= new Vector3D();
 			this._render 		= refaultRender;
 		}
 		
@@ -68,20 +49,6 @@
 			}
 		}
 		
-		override public function dispose() : void {
-			this._bounds = null;
-			this._render = null;
-			var i : int  = 0;
-			while (i < this.geometries.length) {
-				if (this.geometries[i] != null) {
-					this.geometries[i].dispose();
-				}
-				i++;
-			}
-			this.geometries = null;
-			super.dispose();
-		}
-				
 		/**
 		 * 上传
 		 * @param scene
@@ -109,45 +76,14 @@
 		
 		public function clone() : Mesh3D {
 			var mesh : Mesh3D = new Mesh3D();
-			
 			for each (var geo : Geometry3D in this.geometries) {
 				mesh.geometries.push(geo);
 			}
 			mesh.render = render;
 			mesh.frames = frames;
-			
 			return mesh;
 		}
 		
-		/**
-		 *  更新bounds
-		 */		
-		public function updateBoundings() : void {
-			this._bounds = null;
-			this._bounds = this.bounds;
-		}
-		
-		public function get bounds() : Bounds3D {
-			return this._bounds;
-		}
-		
-		public function set bounds(value : Bounds3D) : void {
-			this._bounds = value;
-		}
-		
-		override public function updateTransforms(includeChildren : Boolean = false) : void {
-			super.updateTransforms(includeChildren);
-			this._updateBoundsScale = true;
-		}
-		
-		public function set alwaysInview(value : Boolean) : void {
-			this._inViewAlways = value;
-		}
-		
-		public function get alwaysInview() : Boolean {
-			return this._inViewAlways;
-		}
-
 		override public function draw(includeChildren : Boolean = true, shaderBase : Shader3D = null) : void {
 			if (this._scene == null) {
 				this._scene = Device3D.scene;

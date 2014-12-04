@@ -388,7 +388,8 @@ package core.shader {
 			context.setProgramConstantsFromMatrix(Context3DProgramType.VERTEX, regCache.vcMvp.index, Device3D.worldViewProj, true);
 			
 			if (regCache.hasBone) {
-				context.setProgramConstantsFromVector(Context3DProgramType.VERTEX, regCache.boneVcs.index, Device3D.bonesMatrices, -1);
+//				context.setProgramConstantsFromVector(Context3DProgramType.VERTEX, regCache.boneVcs.index, Device3D.bonesMatrices, -1);
+				context.setProgramConstantsFromByteArray(Context3DProgramType.VERTEX, regCache.boneVcs.index, Device3D.boneNum * 2, Device3D.bonesMatrices, 0);
 			}
 			
 			// 设置vc

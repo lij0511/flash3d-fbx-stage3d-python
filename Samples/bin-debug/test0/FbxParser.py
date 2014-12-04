@@ -78,11 +78,11 @@ from FbxCommon import *
 from string import count
 import argparse
 import json
-import math
 import os
 import re
 import struct
 import zlib
+import sys
 
 # object
 class LObject(object):
@@ -97,8 +97,7 @@ ANIM_TYPE   = ".anim"
 CAMERA_TYPE = ".camera"
 SCENE_TYPE  = ".scene"
 # 翻转
-AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(-90, 180, 0), FbxVector4(-1, 1, 1))
-AXIS_FLIP_X = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
+AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
 # 最大权重数量
 MAX_WEIGHT_NUM = 4
 # 最大顶点数
@@ -114,12 +113,14 @@ def parseArgument():
     parser = argparse.ArgumentParser()
     # 解析法线
     parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = True)
+    # 解析切线
+    parser.add_argument("-tangent", help = "parse tangent",     action = "store_true",      default = False)
     # 解析UV0
     parser.add_argument("-uv0",     help = "parse uv0",         action = "store_true",      default = True)
     # 解析UV1
-    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = True)
+    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = False)
     # 解析动画
-    parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = True)
+    parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = False)
     # 使用全局坐标
     parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = True)
     # 指定Fbx文件路径
@@ -130,8 +131,6 @@ def parseArgument():
     parser.add_argument("-max_quat",help = "bone num with quat",action = "store",           default = 56)
     # 使用矩阵时，最大骨骼数
     parser.add_argument("-max_m34", help = "bone num with m34", action = "store",           default = 36)
-    # 绑定点
-    parser.add_argument("-joint",   help = "joints of attach",  action = "store",           default = "")
     
     option = parser.parse_args()
     
@@ -325,6 +324,9 @@ class Camera3D(object):
     def parseCameraAnim(self):
         # 获取stack
         stack = self.scene.GetSrcObject(FbxAnimStack.ClassId, 0)
+        if not stack:
+            return
+            pass
         self.scene.SetCurrentAnimationStack(stack)
         # 获取时间
         timeSpan  = stack.GetLocalTimeSpan()
@@ -334,7 +336,7 @@ class Camera3D(object):
         frameTime.SetTime(0, 0, 0, 1, 0, self.scene.GetGlobalSettings().GetTimeMode())
         # 解析每一帧动画
         while time <= timeSpan.GetStop():
-            animMt = AXIS_FLIP_X * self.fbxCamera.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
+            animMt = AXIS_FLIP_L * self.fbxCamera.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
             matrix = Matrix3D(animMt)
             clip   = []
             # 丢弃最后一列数据
@@ -370,7 +372,7 @@ class Camera3D(object):
         self.bytes += struct.pack('<f', self.far)               # far
         self.bytes += struct.pack('<f', self.fieldOfView)       # fieldOfView
         # 保存相机当前位置
-        animMt = AXIS_FLIP_X * self.fbxCamera.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+        animMt = AXIS_FLIP_L * self.fbxCamera.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
         matrix = Matrix3D(animMt)
         # 丢弃最后一列数据
         for i in range(3):
@@ -403,11 +405,11 @@ class Camera3D(object):
         self.scene       = scene
         self.fbxFilePath = filepath
         # axis
-        self.axisTransform    = AXIS_FLIP_X
+        self.axisTransform    = AXIS_FLIP_L
         self.invAxisTransform = FbxAMatrix(self.axisTransform)
         self.invAxisTransform.Inverse()
         # 相机名称
-        self.name = unicode(str(fbxCamera.GetNode().GetName()), "utf-8")
+        self.name = str(fbxCamera.GetNode().GetName())
         print("\t%s" % self.name)
         # 解析相机属性
         self.parseCameraProperties()
@@ -484,7 +486,7 @@ class Material(object):
             count = prop.GetSrcObjectCount(FbxTexture.ClassId)
             for j in range(count):
                 texture = prop.GetSrcObject(FbxTexture.ClassId, j)
-                self.textureName = unicode(str(texture.GetFileName()), "utf-8")
+                self.textureName = str(texture.GetFileName())
                 pass
             pass
         # 解析文件名
@@ -515,6 +517,7 @@ class Mesh(object):
         self.uvs0               = []            # UV0
         self.uvs1               = []            # UV1,可能为烘焙贴图UV
         self.normals            = []            # 法线
+        self.tangents           = []            # 切线
         self.weightsAndIndices  = []            # 权重以及索引
         self.bounds             = LObject()     # 包围盒
         self.anims              = []            # 动画|如果为骨骼模型，那么保存骨骼数据，否则就保存帧Transform数据
@@ -542,15 +545,17 @@ class Mesh(object):
         self.invGeometryTrans   = FbxAMatrix(self.geometryTransform)
         self.invGeometryTrans   = self.invGeometryTrans.Inverse()
         
+        printFBXAMatrix("\tGeometry Matrix:", self.geometryTransform)
+        
         self.axisTransform    = AXIS_FLIP_L * self.geometryTransform
         self.invAxisTransform = FbxAMatrix(self.axisTransform)
         self.invAxisTransform = self.invAxisTransform.Inverse()
             
         if config.world:
-            self.transform = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform
+            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform
             pass
         else:
-            self.transform = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
             pass
         
         printFBXAMatrix("\tGlobal Matrix:", self.transform)
@@ -651,21 +656,35 @@ class Mesh(object):
         if layerCount >= 1:
             print("\tparse UV0...")
             uvs   = self.fbxMesh.GetLayer(0).GetUVs()
-            count = uvs.GetDirectArray().GetCount()
             data  = uvs.GetDirectArray()
-            for i in range(count):
-                uv = data.GetAt(i)
-                self.uvs0.append([uv[0], 1 - uv[1]])
-                pass # end for
-            # 组织UV数据
-            count = len(self.uvIndices)
-            uvs   = []
-            for i in range(count):
-                idx = self.uvIndices[i]
-                uv  = self.uvs0[idx]
-                uvs.append(uv)
-                pass # end for
-            self.uvs0 = uvs
+            polygonCount = self.fbxMesh.GetPolygonCount()
+            vertIdx = 0
+            for i in range(polygonCount):
+                for j in range(3):
+                    controlPointIndex = self.fbxMesh.GetPolygonVertex(i, j)
+                    # by point
+                    if uvs.GetMappingMode() == FbxLayerElement.eByControlPoint:
+                        if uvs.GetReferenceMode() == FbxLayerElement.eDirect:
+                            uv = data.GetAt(controlPointIndex)
+                            pass
+                        elif uvs.GetReferenceMode() == FbxLayerElement.eIndexToDirect:
+                            idx = uvs.GetIndexArray().GetAt(controlPointIndex)
+                            uv = data.GetAt(idx)
+                            pass
+                        pass # end if
+                    elif uvs.GetMappingMode() == FbxLayerElement.eByPolygonVertex:
+                        if uvs.GetReferenceMode() == FbxLayerElement.eDirect:
+                            uv = data.GetAt(vertIdx)
+                            pass #end
+                        elif uvs.GetReferenceMode() == FbxLayerElement.eIndexToDirect:
+                            idx = uvs.GetIndexArray().GetAt(vertIdx)
+                            uv = data.GetAt(idx)
+                            pass
+                        pass # end
+                    self.uvs0.append([uv[0], 1 - uv[1]])
+                    vertIdx += 1
+                    pass # end for polygon size
+                pass # end for polygon count
             print("\tUV0 num:%d" % (len(self.uvs0)))
             # 重构uv0索引顺序
             count = len(self.uvs0)
@@ -686,22 +705,36 @@ class Mesh(object):
         layerCount = self.fbxMesh.GetLayerCount()
         if layerCount >= 2:
             print("\tparse UV1...")
-            uvs   = self.fbxMesh.GetLayer(0).GetUVs()
-            count = uvs.GetDirectArray().GetCount()
+            uvs   = self.fbxMesh.GetLayer(1).GetUVs()
             data  = uvs.GetDirectArray()
-            for i in range(count):
-                uv = data.GetAt(i)
-                self.uvs1.append([uv[0], 1 - uv[1]])
+            polygonCount = self.fbxMesh.GetPolygonCount()
+            vertIdx = 0
+            for i in range(polygonCount):
+                for j in range(3):
+                    controlPointIndex = self.fbxMesh.GetPolygonVertex(i, j)
+                    # by point
+                    if uvs.GetMappingMode() == FbxLayerElement.eByControlPoint:
+                        if uvs.GetReferenceMode() == FbxLayerElement.eDirect:
+                            uv = data.GetAt(controlPointIndex)
+                            pass
+                        elif uvs.GetReferenceMode() == FbxLayerElement.eIndexToDirect:
+                            idx = uvs.GetIndexArray().GetAt(controlPointIndex)
+                            uv = data.GetAt(idx)
+                            pass
+                        pass # end if
+                    elif uvs.GetMappingMode() == FbxLayerElement.eByPolygonVertex:
+                        if uvs.GetReferenceMode() == FbxLayerElement.eDirect:
+                            uv = data.GetAt(vertIdx)
+                            pass #end
+                        elif uvs.GetReferenceMode() == FbxLayerElement.eIndexToDirect:
+                            idx = uvs.GetIndexArray().GetAt(vertIdx)
+                            uv = data.GetAt(idx)
+                            pass
+                        pass # end
+                    self.uvs1.append([uv[0], 1 - uv[1]])
+                    vertIdx += 1
+                    pass # end for
                 pass # end for
-            # 组织UV1数据
-            count = len(self.uvIndices)
-            uvs   = []
-            for i in range(count):
-                idx = self.uvIndices[i]
-                uv  = self.uvs1[idx]
-                uvs.append(uv)
-                pass # end for
-            self.uvs1 = uvs
             print("\tUV1 num:%d" % (len(self.uvs1)))
             # 重构uv1索引顺序
             count = len(self.uvs1)
@@ -746,6 +779,43 @@ class Mesh(object):
             self.normals[i * 3 + 0] = v0
             self.normals[i * 3 + 1] = v2
             self.normals[i * 3 + 2] = v1
+            pass # end for
+        pass # end func
+    
+    # 解析切线
+    def parseTangent(self):  
+        print("\tparse tangents...")
+        if not config.normal:
+            self.parseNormals()
+            pass
+        # 计算切线
+        self.fbxMesh.GenerateTangentsDataForAllUVSets()
+        tangents = self.fbxMesh.GetLayer(0).GetTangents()
+        count    = tangents.GetDirectArray().GetCount()
+        data     = tangents.GetDirectArray()
+        print("\t tangent num:%d" % count)
+        for i in range(count):
+            self.tangents.append(data.GetAt(i))
+            pass
+        # 对切线进行转换
+        count = len(self.tangents)
+        axis  = Matrix3D(self.axisTransform)
+        for i in range(count):
+            tan = self.tangents[i]
+            tan = axis.deltaTransformVector(tan)
+            tan = FbxVector4(tan[0], tan[1], tan[2], 1)
+            tan.Normalize()
+            self.tangents[i] = [tan[0], tan[1], tan[2]]
+            pass # end for
+        # 重构切线索引顺序
+        count = count / 3
+        for i in range(count):
+            v0 = self.tangents[i * 3 + 0]
+            v1 = self.tangents[i * 3 + 1]
+            v2 = self.tangents[i * 3 + 2]
+            self.tangents[i * 3 + 0] = v0
+            self.tangents[i * 3 + 1] = v2
+            self.tangents[i * 3 + 2] = v1
             pass # end for
         pass # end func
     
@@ -861,7 +931,7 @@ class Mesh(object):
     # 解析帧动画
     def parseFrameAnim(self, time):
         # 顶点 * axis * [axis的逆矩阵 * global * axis]
-        animMt = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
+        animMt = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
         matrix = Matrix3D(animMt)
         clip   = []
         # 丢弃最后一列数据
@@ -889,6 +959,9 @@ class Mesh(object):
             pass #
         # 获取stack
         stack = self.scene.GetSrcObject(FbxAnimStack.ClassId, 0)
+        if not stack:
+            return
+            pass
         self.scene.SetCurrentAnimationStack(stack)
         # 获取时间
         timeSpan  = stack.GetLocalTimeSpan()
@@ -917,7 +990,7 @@ class Mesh(object):
         fbxName = fbxName.split(".")[0:-1]
         fbxName = ".".join(fbxName)
         fbxDir  = parseFilepath(self.fbxFilePath)
-        self.meshFileName = fbxDir + fbxName + "_" + unicode(self.name, "utf-8") + MESH_TYPE
+        self.meshFileName = fbxDir + fbxName + "_" + self.name + MESH_TYPE
         # 组织Mesh数据
         data = b''
         # 写名称
@@ -958,6 +1031,12 @@ class Mesh(object):
             for i in range(count):
                 normal = subMesh.normals[i]
                 data  += struct.pack('<fff', normal[0], normal[1], normal[2])
+                pass
+            count = len(subMesh.tangents)
+            data += struct.pack('<i', count)
+            for i in range(count):
+                tan   = subMesh.tangents[i]
+                data += struct.pack('<fff', tan[0], tan[1], tan[2])
                 pass
             # 写权重数据
             count = len(subMesh.weightsAndIndices)
@@ -1051,7 +1130,7 @@ class Mesh(object):
         fbxName = fbxName.split(".")[0:-1]
         fbxName = ".".join(fbxName)
         fbxDir  = parseFilepath(self.fbxFilePath)
-        self.animFileName = fbxDir + fbxName + "_" + unicode(self.name, "utf-8") + ANIM_TYPE
+        self.animFileName = fbxDir + fbxName + "_" + self.name + ANIM_TYPE
         # 动画类型:0->帧动画;1->矩阵骨骼动画;2->四元数骨骼动画
         data = None
         if self.skeleton:
@@ -1113,6 +1192,8 @@ class Mesh(object):
             subMesh.uvs1                = self.uvs1[idx : idx + MAX_VERTEX_NUM]
             # Normal
             subMesh.normals             = self.normals[idx : idx + MAX_VERTEX_NUM]
+            # tangent
+            subMesh.tangents            = self.tangents[idx : idx + MAX_VERTEX_NUM]
             # 权重索引
             subMesh.weightsAndIndices   = self.weightsAndIndices[idx : idx + MAX_VERTEX_NUM]
             # 包围盒
@@ -1205,6 +1286,12 @@ class Mesh(object):
                 subMesh.normals.append(self.normals[v0])
                 subMesh.normals.append(self.normals[v1])
                 subMesh.normals.append(self.normals[v2])
+                pass
+            # tangent
+            if len(self.tangents) > 0:
+                subMesh.tangents.append(self.tangents[v0])
+                subMesh.tangents.append(self.tangents[v1])
+                subMesh.tangents.append(self.tangents[v2])
                 pass
             # 权重以及索引
             if len(self.weightsAndIndices) > 0:
@@ -1324,6 +1411,9 @@ class Mesh(object):
         # 解析法线
         if config.normal:
             self.parseNormals()
+        # 解析切线
+        if config.tangent:
+            self.parseTangent()
         # 解析动画
         if config.anim:
             self.parseAnim()
@@ -1417,7 +1507,7 @@ def writeSceneConfig(scene):
         obj["meshes"].append(getMeshConfig(scene.meshes[i]))
         pass
     data = json.dumps(obj, sort_keys=True, indent=4)
-    data = unicode(str(data), "utf-8")
+    data = str(data)
     
     tokens  = re.compile("[\\\/]").split(scene.fbxfile)
     fbxName = tokens[-1]
@@ -1463,12 +1553,15 @@ def parseFBX(fbxfile, config):
 
 if __name__ == "__main__":
     
+    reload(sys)
+    sys.setdefaultencoding('utf8')
+    
     # 解析参数
     config = parseArgument()
     fbxList = scanFbxFiles(config.path)
     
     for item in fbxList:
-        parseFBX(unicode(item, "utf-8"), config)
+        parseFBX(item, config)
         pass
     
     pass

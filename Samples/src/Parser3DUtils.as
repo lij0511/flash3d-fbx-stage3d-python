@@ -1,6 +1,5 @@
 package {
 	
-	import flash.geom.Matrix3D;
 	import flash.geom.Vector3D;
 	import flash.utils.ByteArray;
 	import flash.utils.Endian;
@@ -13,7 +12,6 @@ package {
 	import core.camera.PerspectiveLens;
 	import core.render.DefaultRender;
 	import core.render.FrameRender;
-	import core.utils.Matrix3DUtils;
 	import core.render.SkeletonRender;
 
 	/**
@@ -136,6 +134,15 @@ package {
 					subGeometry.sources[Geometry3D.NORMAL].setVertexDataType(Geometry3D.NORMAL, 3);
 					subGeometry.sources[Geometry3D.NORMAL].vertexBytes = normalBytes; 
 				}
+				len = bytes.readInt();
+				if (len > 0) {
+					var tangenBytes : ByteArray = new ByteArray();
+					tangenBytes.endian = Endian.LITTLE_ENDIAN;
+					bytes.readBytes(tangenBytes, 0, len * 12);
+					subGeometry.sources[Geometry3D.TANGENT] = new Geometry3D();
+					subGeometry.sources[Geometry3D.TANGENT].setVertexDataType(Geometry3D.TANGENT, 3);
+					subGeometry.sources[Geometry3D.TANGENT].vertexBytes = tangenBytes; 
+				}
 				// 权重数据
 				len = bytes.readInt();
 				if (len > 0) {
@@ -215,69 +222,26 @@ package {
 		}
 		
 		private static function readSkeletonAnim(bytes : ByteArray, type : int) : DefaultRender {
-
 			var render : SkeletonRender = new SkeletonRender();
-			
 			var num  : int = bytes.readInt();
-			
 			for (var i:int = 0; i < num; i++) {
 				render.skinData[i] = [];
 				var frameCount : int = bytes.readInt();
 				var boneNum    : int = bytes.readInt();
-				
 				render.totalFrames = frameCount;
 				render.quat = type == 2;
 				render.skinBoneNum[i] = Math.ceil(render.quat ? boneNum * 1 : boneNum * 1.5);
-				
-				var tempVec : Vector3D = new Vector3D();
-				var tempMat : Matrix3D = new Matrix3D();
-				
 				for (var j:int = 0; j < frameCount; j++) {
-					var frameData : Vector.<Number> = null;
+					var data : ByteArray = new ByteArray();
+					data.endian = Endian.LITTLE_ENDIAN;
 					if (render.quat) {
-						frameData = new Vector.<Number>(boneNum * 8, true);
+						bytes.readBytes(data, 0, boneNum * 8 * 4);
 					} else {
-						frameData = new Vector.<Number>(boneNum * 12, true);
+						bytes.readBytes(data, 0, boneNum * 12 * 4);
 					}
-					for (var k:int = 0; k < boneNum; k++) {
-						if (render.quat) {
-							frameData[k * 8 + 0] = bytes.readFloat();
-							frameData[k * 8 + 1] = bytes.readFloat();
-							frameData[k * 8 + 2] = bytes.readFloat();
-							frameData[k * 8 + 3] = bytes.readFloat();
-							frameData[k * 8 + 4] = bytes.readFloat();
-							frameData[k * 8 + 5] = bytes.readFloat();
-							frameData[k * 8 + 6] = bytes.readFloat();
-							frameData[k * 8 + 7] = bytes.readFloat();
-						} else {
-							for (var m:int = 0; m < 3; m++) {
-								tempVec.x = bytes.readFloat();				
-								tempVec.y = bytes.readFloat();	
-								tempVec.z = bytes.readFloat();	 
-								tempVec.w = bytes.readFloat();	
-								tempMat.copyRowFrom(m, tempVec);  
-							}
-							frameData[k * 12 + 0] = tempMat.rawData[0];
-							frameData[k * 12 + 1] = tempMat.rawData[4];
-							frameData[k * 12 + 2] = tempMat.rawData[8];
-							frameData[k * 12 + 3] = tempMat.rawData[12];
-							
-							frameData[k * 12 + 4] = tempMat.rawData[1];
-							frameData[k * 12 + 5] = tempMat.rawData[5];
-							frameData[k * 12 + 6] = tempMat.rawData[9];
-							frameData[k * 12 + 7] = tempMat.rawData[13];
-							
-							frameData[k * 12 + 8] = tempMat.rawData[2];
-							frameData[k * 12 + 9] = tempMat.rawData[6];
-							frameData[k * 12 + 10] = tempMat.rawData[10];
-							frameData[k * 12 + 11] = tempMat.rawData[14];
-						}
-					}
-					render.skinData[i][j] = frameData;
+					render.skinData[i][j] = data;
 				}
-				
 			}
-			
 			return render as DefaultRender;
 		}
 	}

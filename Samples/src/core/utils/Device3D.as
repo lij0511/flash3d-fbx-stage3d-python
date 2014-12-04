@@ -4,8 +4,10 @@
 	import flash.display3D.Context3DCompareMode;
 	import flash.geom.Matrix3D;
 	import flash.geom.Rectangle;
-	import core.scene.Scene3D;
+	import flash.utils.ByteArray;
+	
 	import core.camera.Camera3D;
+	import core.scene.Scene3D;
 	import core.texture.Texture3D;
 
 	public final class Device3D {
@@ -95,7 +97,7 @@
 		/**
 		 *	骨骼数据
 		 */
-		public static var bonesMatrices : Vector.<Number>;
+		public static var bonesMatrices : ByteArray;
 		// 初始化默认贴图
 		private static var h : int = 0;
 		private static var v : int;

@@ -10,6 +10,8 @@ package  {
 	import flash.text.StyleSheet;
 	import flash.text.TextField;
 	import flash.utils.getTimer;
+	
+	import core.utils.Device3D;
 
 	public class L3DStats extends Sprite {
 		
@@ -169,6 +171,9 @@ package  {
 				xml.mem = "MEM: " + mem;
 				xml.memMax = "MAX: " + mem_max;
 				xml.ms = "MS:" + ms;
+				xml.trangles = "TRI: " + Device3D.trianglesDrawn;
+				xml.drawCalls = "DRA: " + Device3D.drawCalls;
+				xml.objects = "OBJ: " + Device3D.objectsDrawn;
 				
 				fps = 0;
 			}

@@ -32,13 +32,7 @@
 		protected function onLensProjChanged(event:Event) : void {
 			_projDirty = true;		
 		}
-		
-		override public function dispose():void {
-			super.dispose();
-			this._lens.removeEventListener("PROJECTION_UPDATE", onLensProjChanged);			
-			this._lens = null;
-		}
-				
+						
 		public function set lens(len : LensBase) : void {
 			if (_lens != null) {
 				this._lens.removeEventListener("PROJECTION_UPDATE", onLensProjChanged);
@@ -49,10 +43,6 @@
 				
 		public function get lens() : LensBase {
 			return _lens;
-		}
-		
-		public function getPointDir(x : Number, y : Number, out : Vector3D = null) : Vector3D {
-			return _lens.getPointDir(x, y, world, out);
 		}
 		
 		public function updateProjectionMatrix() : void {

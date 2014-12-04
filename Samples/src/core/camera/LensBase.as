@@ -4,7 +4,6 @@ package core.camera {
 	import flash.events.EventDispatcher;
 	import flash.geom.Matrix3D;
 	import flash.geom.Rectangle;
-	import flash.geom.Vector3D;
 	
 	/**
 	 * 镜头基类
@@ -98,18 +97,6 @@ package core.camera {
 			return _invProjection;
 		}
 		
-		public function clone() : LensBase {
-			var clone : LensBase = new LensBase();
-			clone.far 	= _far;
-			clone.near 	= _near;
-			clone.zoom 	= _zoom;
-			clone.aspectRatio 	= _aspectRatio;
-			clone.viewPort 		= _viewPort;
-			clone._scissorRect 	= _scissorRect;
-			clone.projection.copyFrom(projection);
-			return clone;
-		}
-		
 		public function set viewPort(rect : Rectangle) : void {
 			this._viewPort = rect;
 			invalidateProjection();
@@ -139,14 +126,6 @@ package core.camera {
 			dispatchEvent(_projectEvent);
 		}
 		
-		public function updateScissorRect(x : Number, y : Number, width : Number, height : Number) : void {
-			_scissorRect.x = x;
-			_scissorRect.y = y;
-			_scissorRect.width = width;
-			_scissorRect.height = height;
-			invalidateProjection();
-		}
-		
 		public function updateViewport(x : Number, y : Number, width : Number, height : Number) : void {
 			_viewPort.x = x;
 			_viewPort.y = y;
@@ -154,13 +133,6 @@ package core.camera {
 			_viewPort.height = height;
 			invalidateProjection();
 		}
-		
-		public function getPointDir(x:Number, y:Number, world : Matrix3D, out:Vector3D) : Vector3D {
-			return null;
-		}
-		
-		public function isInView(poitn : Vector3D, radius : Number, viewSpace : Boolean = true) : Boolean {
-			return true;
-		}
+				
 	}
 }

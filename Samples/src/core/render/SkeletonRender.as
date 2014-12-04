@@ -1,5 +1,7 @@
 package core.render {
 
+	import flash.utils.ByteArray;
+	
 	import core.base.Geometry3D;
 	import core.base.Mesh3D;
 	import core.shader.Shader3D;
@@ -8,8 +10,8 @@ package core.render {
 	public class SkeletonRender extends DefaultRender {
 		
 		public var quat : Boolean;
-		public var skinData 		: Vector.<Array> 	= new Vector.<Array>();
-		public var skinBoneNum 	: Vector.<int> 		= new Vector.<int>();
+		public var skinData 		: Vector.<Array> = new Vector.<Array>();
+		public var skinBoneNum 	: Vector.<int> 	= new Vector.<int>();
 		public var totalFrames:int;
 		
 		public function SkeletonRender() {

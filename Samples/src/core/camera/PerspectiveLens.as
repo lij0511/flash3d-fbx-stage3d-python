@@ -12,8 +12,7 @@ package core.camera {
 
 		private static var _inv : Matrix3D;
 		private static const rawData : Vector.<Number> = new Vector.<Number>(16, true);
-		private static const rawPlanes : Vector.<Number> = new Vector.<Number>(16, true);
-
+		
 		private var _fieldOfView : Number;
 		private var _aspect : Number;
 		private var _cachedAspectRatio : Number;
@@ -119,24 +118,7 @@ package core.camera {
 			rawData[5] = (y / (h / this._viewPort.height));
 			rawData[8] = (1 - (this._viewPort.width / w)) - ((this._viewPort.x / w) * 2);
 			rawData[9] = (-1 + (this._viewPort.height / h)) + ((this._viewPort.y / h) * 2);
-
-			// 真正的透视投影算法，如果需要可以启用。
-//			var _focalLengthInv : Number = Math.tan(120 * Math.PI / 360);
-//			var _focalLength		: Number = 1 / _focalLengthInv;
-//			var _yMax			: Number = _near * _focalLengthInv;
-//			var _xMax			: Number = _yMax * a;
-//			var left				: Number = -_xMax;
-//			var right			: Number = _xMax;
-//			var top				: Number = -_yMax;
-//			var bottom			: Number = _yMax;
-//			
-//			rawData[0] = _near / _xMax;
-//			rawData[5] = _near / _yMax;
-//			rawData[10] = _far / (_far - _near);
-//			rawData[11] = 1;
-//			rawData[1]  = rawData[2] = rawData[3] = rawData[4] = rawData[6] = rawData[7] = rawData[8] = rawData[9] = rawData[12] = rawData[13] = rawData[15] = 0;
-//			rawData[14] = -_near * rawData[10];
-
+			
 			this._projection.copyRawDataFrom(rawData);
 			this._projection.prependScale(1, 1, -1);
 			this.dispatchEvent(_projectEvent);

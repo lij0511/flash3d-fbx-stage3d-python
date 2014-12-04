@@ -19,12 +19,9 @@
 		public static const ANIMATION_LOOP_MODE 	: int 	= 0;
 		/** 非循环动画 */
 		public static const ANIMATION_STOP_MODE 	: int 	= 2;
-		public static const PI 					: Number	= Math.PI;
 		// 临时变量
 		protected static var _temp0 : Vector3D = new Vector3D();
-		protected static var _temp1 : Vector3D = new Vector3D();
-		protected static var _temp2 : Vector3D = new Vector3D();
-			
+		
 		/** 名称 */
 		public var name 		: String;
 		/** 动画标签 */
@@ -132,26 +129,6 @@
 			}
 		}
 		
-		public function dispose() : void {
-			if (this._invGlobal == null) {
-				return;
-			}
-			this.stop();
-			// dispose children
-			while (this._children.length) {
-				this._children[0].dispose();
-			}
-			this._children.length = 0;
-			this._children 	= null;
-			this.frames 		= null;
-			this._children 	= null;
-			this._scene 		= null;
-			this._world 		= null;
-			this._transform 	= null;
-			this._invGlobal 	= null;
-			this._vector 	= null;
-		}
-
 		/**
 		 * 设置坐标
 		 * @param x			x
@@ -202,41 +179,6 @@
 			return out;
 		}
 		
-		/**
-		 * 获取rotationY值，该值范围为-180到180。使用欧拉角获取的数据只能为-90到90。因此需要根据方位计算出更大范围的值。
-		 * @param local	标识是否获取local或者global旋转值
-		 * @return
-		 */
-		public function getRotationY(local : Boolean) : Number {
-			var dir : Vector3D = getDir(local);
-			var ang : Number   = Math.atan2(dir.x, dir.z) * 180 / PI;
-			return ang;
-		}
-
-		/**
-		 * 获取rotationX值，该值范围为-180到180。使用欧拉角获取的数据只能为-90到90。因此需要根据方位计算出更大范围的值。
-		 * @param local 标识是否获取local或者global旋转值
-		 * @return
-		 *
-		 */
-		public function getRotationX(local : Boolean) : Number {
-			var dir : Vector3D = getDir(local);
-			var ang : Number   = Math.atan2(dir.y, dir.z) * 180 / PI;
-			return ang;
-		}
-
-		/**
-		 * 获取rotationZ值，该值范围为-180到180。使用欧拉角获取的数据只能为-90到90。因此需要根据方位计算出更大范围的值。
-		 * @param local 标识是否获取local或者global旋转值
-		 * @return
-		 *
-		 */
-		public function getRotationZ(local : Boolean) : Number {
-			var dir : Vector3D = getDir(local);
-			var ang : Number   = Math.atan2(dir.x, dir.y) * 180 / PI;
-			return ang;
-		}
-
 		/**
 		 * 设置角度
 		 * @param x
@@ -984,22 +926,6 @@
 			return this._scene;
 		}
 		
-		/**
-		 * 显示
-		 *
-		 */
-		public function show() : void {
-			visible = true;
-		}
-
-		/**
-		 * 隐藏
-		 *
-		 */
-		public function hide() : void {
-			visible = false;
-		}
-
 		/**
 		 * draw
 		 * @param includeChildren

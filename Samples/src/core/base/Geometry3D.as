@@ -79,7 +79,6 @@
 			this.sources = new Vector.<Geometry3D>(14, true);
 			this.formats = new Vector.<String>();
 			this.name = name;
-			
 			var i : int = 0;
 			while (i < this.offsets.length) {
 				this.offsets[i] = -1;
