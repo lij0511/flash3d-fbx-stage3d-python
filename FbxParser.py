@@ -686,7 +686,7 @@ class Mesh(object):
         layerCount = self.fbxMesh.GetLayerCount()
         if layerCount >= 2:
             print("\tparse UV1...")
-            uvs   = self.fbxMesh.GetLayer(0).GetUVs()
+            uvs   = self.fbxMesh.GetLayer(1).GetUVs()
             count = uvs.GetDirectArray().GetCount()
             data  = uvs.GetDirectArray()
             for i in range(count):
