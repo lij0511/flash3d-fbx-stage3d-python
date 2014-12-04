@@ -1,5 +1,6 @@
 package {
 	
+	import flash.geom.Matrix3D;
 	import flash.geom.Vector3D;
 	import flash.utils.ByteArray;
 	import flash.utils.Endian;
@@ -240,6 +241,27 @@ package {
 						bytes.readBytes(data, 0, boneNum * 12 * 4);
 					}
 					render.skinData[i][j] = data;
+				}
+			}
+			// 读取帧数
+			frameCount = bytes.readInt();
+			// 读取绑定点数量
+			num = bytes.readInt();
+			var vec : Vector3D = new Vector3D();
+			for (i = 0; i < num; i++) {
+				var size : int = bytes.readInt();
+				var name : String = bytes.readUTFBytes(size);
+				for (j = 0; j < frameCount; j++) {
+					// 读取绑定点数据
+					var mt : Matrix3D = new Matrix3D();
+					for (var k:int = 0; k < 3; k++) {
+						vec.x = bytes.readFloat();
+						vec.y = bytes.readFloat();
+						vec.z = bytes.readFloat();
+						vec.w = bytes.readFloat();
+						mt.copyRowFrom(k, vec);
+					}
+					render.addMount(name, j, mt);
 				}
 			}
 			return render as DefaultRender;

@@ -5,10 +5,14 @@ package {
 	import flash.display.StageScaleMode;
 	import flash.events.Event;
 	
+	import core.base.Cube;
 	import core.base.Geometry3D;
 	import core.base.Mesh3D;
 	import core.loader.SceneLoader;
+	import core.render.SkeletonRender;
 	import core.scene.Scene3D;
+	import core.shader.Shader3D;
+	import core.shader.filter.ColorFilter;
 	import core.shader.filter.Filter3D;
 	import core.shader.filter.TextureMapFilter;
 	import core.texture.Texture3D;
@@ -48,6 +52,8 @@ package {
 			scene.addEventListener(Event.CONTEXT3D_CREATE, onCreate);
 		}
 		
+		private var weapon : Cube = new Cube("", 100, 10, 10, 1, new Shader3D("", [new ColorFilter(0xFF00FF)]));
+		
 		protected function onSkeMeshComplete(event:MeshEvent) : void {
 			var mesh : Mesh3D = 	event.mesh;
 			for each (var geo : Geometry3D in mesh.geometries) {
@@ -55,7 +61,7 @@ package {
 				(filter as TextureMapFilter).texture = new Texture3D(PathUtil.dirName(this.loaderInfo.url) + "/" + "test1/Akali_Red_TX_CM.jpg");
 			}
 			
-			var num  : int = 50;
+			var num  : int = 30;
 			for (var i:int = 0; i < num; i++) {
 				for (var j:int = 0; j < num; j++) {
 					var clone : Mesh3D = mesh.clone();
@@ -66,6 +72,18 @@ package {
 					clone.play();
 				}
 			}
+			
+			// 武器
+			mesh.setScale(5, 5, 5);
+			mesh.addChild(weapon);
+			mesh.addEventListener("exitFrame", onSkeletonMeshexitFrame);
+		}
+		
+		protected function onSkeletonMeshexitFrame(event:Event) : void {
+			var mesh : Mesh3D = event.target as Mesh3D;
+			var render : SkeletonRender = mesh.render as SkeletonRender;
+			weapon.transform.copyFrom(render.getMount("weapon", int(mesh.currentFrame)));
+			weapon.updateTransforms(true);
 		}
 		
 		protected function onLoadCamera(event:CameraEvent) : void {

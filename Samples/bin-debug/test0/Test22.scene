@@ -6,7 +6,7 @@
         {
             "anim": {
                 "name": "Test22_Plane001.anim", 
-                "totalFrames": 0
+                "totalFrames": 101
             }, 
             "name": "Test22_Plane001.mesh", 
             "skeleton": false, 
@@ -32,7 +32,7 @@
         {
             "anim": {
                 "name": "Test22_Box001.anim", 
-                "totalFrames": 0
+                "totalFrames": 101
             }, 
             "name": "Test22_Box001.mesh", 
             "skeleton": false, 
@@ -58,7 +58,7 @@
         {
             "anim": {
                 "name": "Test22_Sphere001.anim", 
-                "totalFrames": 0
+                "totalFrames": 101
             }, 
             "name": "Test22_Sphere001.mesh", 
             "skeleton": false, 
@@ -84,7 +84,7 @@
         {
             "anim": {
                 "name": "Test22_Cone001.anim", 
-                "totalFrames": 0
+                "totalFrames": 101
             }, 
             "name": "Test22_Cone001.mesh", 
             "skeleton": false, 
@@ -110,7 +110,7 @@
         {
             "anim": {
                 "name": "Test22_Box002.anim", 
-                "totalFrames": 0
+                "totalFrames": 101
             }, 
             "name": "Test22_Box002.mesh", 
             "skeleton": false, 

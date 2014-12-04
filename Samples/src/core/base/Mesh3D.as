@@ -1,5 +1,7 @@
 ﻿package core.base {
 
+	import flash.events.Event;
+	
 	import core.render.DefaultRender;
 	import core.render.FrameRender;
 	import core.render.SkeletonRender;
@@ -96,6 +98,7 @@
 					i--;
 				}
 			}
+			this.dispatchEvent(new Event("exitFrame"));
 		}
 	}
 }

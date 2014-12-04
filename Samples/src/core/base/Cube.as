@@ -55,15 +55,8 @@
 			this.createPlane(depth, height, (width * 0.5), segments, "-yz");
 			this.createPlane(width, depth, (height * 0.5), segments, "+xz");
 			this.createPlane(width, depth, (height * 0.5), segments, "-xz");
-
-			var max : Number = Math.max(width, height, depth) * 0.5;
 			
-			this.bounds = new Bounds3D();
-			this.bounds.max.setTo( width * 0.5,  height * 0.5,  depth * 0.5);
-			this.bounds.min.setTo(-width * 0.5, -height * 0.5, -depth * 0.5);
-			this.bounds.length = bounds.max.subtract(bounds.min);
-			this.bounds.radius = Vector3D.distance(bounds.center, bounds.max);
-
+			
 		}
 		
 		private function createPlane(width : Number, height : Number, depth : Number, segments : int, axis : String) : void {

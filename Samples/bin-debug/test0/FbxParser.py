@@ -83,6 +83,7 @@ import re
 import struct
 import zlib
 import sys
+from platform import system
 
 # object
 class LObject(object):
@@ -112,7 +113,7 @@ def parseArgument():
     
     parser = argparse.ArgumentParser()
     # 解析法线
-    parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = True)
+    parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = False)
     # 解析切线
     parser.add_argument("-tangent", help = "parse tangent",     action = "store_true",      default = False)
     # 解析UV0
@@ -120,7 +121,7 @@ def parseArgument():
     # 解析UV1
     parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = False)
     # 解析动画
-    parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = False)
+    parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = True)
     # 使用全局坐标
     parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = True)
     # 指定Fbx文件路径
@@ -131,8 +132,11 @@ def parseArgument():
     parser.add_argument("-max_quat",help = "bone num with quat",action = "store",           default = 56)
     # 使用矩阵时，最大骨骼数
     parser.add_argument("-max_m34", help = "bone num with m34", action = "store",           default = 36)
+    # 挂节点
+    parser.add_argument("-mount",  help = "mount bone, split by ','",    action = "store",  default = "weapon")
     
     option = parser.parse_args()
+    option.mount = option.mount.split(",")
     
     return option
     pass
@@ -534,6 +538,7 @@ class Mesh(object):
         self.bounds.max         = [0, 0, 0]     # max
         self.geometries         = []            # sub geometry
         self.material           = None          # 材质
+        self.mounts             = {}            # 挂接点
         
         pass #end func
     
@@ -926,6 +931,23 @@ class Mesh(object):
             clip.append(self.parseJointFrameAnim(self.joints[i], time))
             pass # end func
         self.anims.append(clip)
+        
+        boneCount = self.scene.GetSrcObjectCount(FbxSkeleton.ClassId)
+        for i in range(boneCount):
+            skeleton = self.scene.GetSrcObject(FbxSkeleton.ClassId, i)
+            boneName = skeleton.GetNode().GetName()
+            boneNode = skeleton.GetNode()
+            if boneName in config.mount:
+                if not self.mounts.get(boneName):
+                    self.mounts[boneName] = []
+                    pass # end dict
+                transform   = boneNode.EvaluateGlobalTransform(time)
+                invTansform = FbxAMatrix(AXIS_FLIP_L)
+                invTansform = invTansform.Inverse()
+                transform   = AXIS_FLIP_L * transform * invTansform
+                self.mounts[boneName].append(transform)
+                pass # end in mount
+            pass # end for
         pass
     
     # 解析帧动画
@@ -1119,6 +1141,24 @@ class Mesh(object):
                     pass # end for
                 pass # end for
             pass
+        
+        # 写帧数
+        frameCount = len(subMesh.anims)
+        data += struct.pack('<i', frameCount)
+        # 写挂接点数据
+        count = len(self.mounts)
+        data += struct.pack('<i', count)
+        for key in self.mounts:
+            ssize = len(key)
+            # 写挂接点名称
+            data += struct.pack('<i', ssize)
+            data += str(key)
+            # 写挂接点每一帧数据
+            bones = self.mounts.get(key)
+            for i in range(frameCount):
+                data += getMatrix3DBytes(bones[i])
+                pass
+            pass
         return data
         pass # end func
     
@@ -1203,6 +1243,8 @@ class Mesh(object):
             subMesh.anims               = self.anims[0:]
             # 骨骼
             subMesh.joints              = self.joints[0:]
+            # 挂接点
+            subMesh.mounts              = self.mounts
             # ʕ•̫͡•ʕ*̫͡*ʕ
             idx += MAX_VERTEX_NUM
             # 添加到geometries
@@ -1313,6 +1355,7 @@ class Mesh(object):
             subMesh.invAxisTransform    = self.invAxisTransform
             subMesh.material            = self.material
             subMesh.transform           = self.transform
+            subMesh.mounts              = self.mounts
             # 重构骨骼索引
             joints  = []
             oldIndexMap = {}
