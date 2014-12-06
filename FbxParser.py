@@ -98,7 +98,8 @@ ANIM_TYPE   = ".anim"
 CAMERA_TYPE = ".camera"
 SCENE_TYPE  = ".scene"
 # 翻转
-AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
+AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(-90, 0, 0),  FbxVector4(1, -1, 1))
+AXIS_FLIP_X = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(-180, 0, 0), FbxVector4(1, -1, 1))
 # 最大权重数量
 MAX_WEIGHT_NUM = 4
 # 最大顶点数
@@ -113,17 +114,17 @@ def parseArgument():
     
     parser = argparse.ArgumentParser()
     # 解析法线
-    parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = False)
+    parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = True)
     # 解析切线
-    parser.add_argument("-tangent", help = "parse tangent",     action = "store_true",      default = False)
+    parser.add_argument("-tangent", help = "parse tangent",     action = "store_true",      default = True)
     # 解析UV0
     parser.add_argument("-uv0",     help = "parse uv0",         action = "store_true",      default = True)
     # 解析UV1
-    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = False)
+    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = True)
     # 解析动画
     parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = True)
     # 使用全局坐标
-    parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = True)
+    parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = False)
     # 指定Fbx文件路径
     parser.add_argument("-path",    help = "fbx file path  ",   action = "store",           default = "")
     # 使用四元数方式
@@ -557,13 +558,13 @@ class Mesh(object):
         self.invAxisTransform = self.invAxisTransform.Inverse()
             
         if config.world:
-            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform
+            self.transform = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
             pass
         else:
-            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+            self.transform = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform
             pass
         
-        printFBXAMatrix("\tGlobal Matrix:", self.transform)
+        printFBXAMatrix("\tTransform Matrix:", self.transform)
             
         pass # end func
     
@@ -646,9 +647,9 @@ class Mesh(object):
             v0 = self.vertices[i * 3 + 0]
             v1 = self.vertices[i * 3 + 1]
             v2 = self.vertices[i * 3 + 2]
-            self.vertices[i * 3 + 0] = v0
-            self.vertices[i * 3 + 1] = v2
-            self.vertices[i * 3 + 2] = v1
+            self.vertices[i * 3 + 0] = v2
+            self.vertices[i * 3 + 1] = v1
+            self.vertices[i * 3 + 2] = v0
             pass # end for
         # 解析包围盒
         self.parseBounds()
@@ -698,9 +699,9 @@ class Mesh(object):
                 v0 = self.uvs0[i * 3 + 0]
                 v1 = self.uvs0[i * 3 + 1]
                 v2 = self.uvs0[i * 3 + 2]
-                self.uvs0[i * 3 + 0] = v0
-                self.uvs0[i * 3 + 1] = v2
-                self.uvs0[i * 3 + 2] = v1
+                self.uvs0[i * 3 + 0] = v2
+                self.uvs0[i * 3 + 1] = v1
+                self.uvs0[i * 3 + 2] = v0
                 pass # end for
             pass # end if
         pass # end func
@@ -748,9 +749,9 @@ class Mesh(object):
                 v0 = self.uvs1[i * 3 + 0]
                 v1 = self.uvs1[i * 3 + 1]
                 v2 = self.uvs1[i * 3 + 2]
-                self.uvs1[i * 3 + 0] = v0
-                self.uvs1[i * 3 + 1] = v2
-                self.uvs1[i * 3 + 2] = v1
+                self.uvs1[i * 3 + 0] = v2
+                self.uvs1[i * 3 + 1] = v1
+                self.uvs1[i * 3 + 2] = v0
                 pass # end for
             pass # end if
         pass # end func
@@ -781,9 +782,9 @@ class Mesh(object):
             v0 = self.normals[i * 3 + 0]
             v1 = self.normals[i * 3 + 1]
             v2 = self.normals[i * 3 + 2]
-            self.normals[i * 3 + 0] = v0
-            self.normals[i * 3 + 1] = v2
-            self.normals[i * 3 + 2] = v1
+            self.normals[i * 3 + 0] = v2
+            self.normals[i * 3 + 1] = v1
+            self.normals[i * 3 + 2] = v0
             pass # end for
         pass # end func
     
@@ -818,9 +819,9 @@ class Mesh(object):
             v0 = self.tangents[i * 3 + 0]
             v1 = self.tangents[i * 3 + 1]
             v2 = self.tangents[i * 3 + 2]
-            self.tangents[i * 3 + 0] = v0
-            self.tangents[i * 3 + 1] = v2
-            self.tangents[i * 3 + 2] = v1
+            self.tangents[i * 3 + 0] = v2
+            self.tangents[i * 3 + 1] = v1
+            self.tangents[i * 3 + 2] = v0
             pass # end for
         pass # end func
     
@@ -865,9 +866,9 @@ class Mesh(object):
             v0 = self.weightsAndIndices[i * 3 + 0]
             v1 = self.weightsAndIndices[i * 3 + 1]
             v2 = self.weightsAndIndices[i * 3 + 2]
-            self.weightsAndIndices[i * 3 + 0] = v0
-            self.weightsAndIndices[i * 3 + 1] = v2
-            self.weightsAndIndices[i * 3 + 2] = v1
+            self.weightsAndIndices[i * 3 + 0] = v2
+            self.weightsAndIndices[i * 3 + 1] = v1
+            self.weightsAndIndices[i * 3 + 2] = v0
             pass # end for
         
         pass # end func
