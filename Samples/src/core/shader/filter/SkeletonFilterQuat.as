@@ -1,6 +1,7 @@
 package core.shader.filter {
 
 	import core.base.Geometry3D;
+	import core.shader.filter.Filter3D;
 	import core.shader.utils.ShaderRegisterCache;
 	import core.shader.utils.ShaderRegisterElement;
 	import core.shader.utils.VcRegisterLabel;
@@ -12,28 +13,28 @@ package core.shader.filter {
 	public class SkeletonFilterQuat extends Filter3D {
 
 		// 骨骼常量寄存器
-		private var constansVector : Vector.<Number> = Vector.<Number>([1, 0, 0, 0]);
+		private var data : Vector.<Number>;
 
 		public function SkeletonFilterQuat(name : String = "defult filter") {
 			super(name);
-			priority = 1000;
+			this.data = Vector.<Number>([1, 0, 0, 0])
+			this.priority = 1000;
 		}
 
 		override public function getVertexCode(regCache : ShaderRegisterCache) : String {
 
 			// 设置骨骼vc偏移
-			constansVector[3] = regCache.boneVcs.index;
+			data[3] = regCache.boneVcs.index;
 
 			var vc123 : ShaderRegisterElement = regCache.getVc();
-			regCache.vcUsed.push(new VcRegisterLabel(vc123, constansVector));
-
-			var jointVa : Vector.<String> = Vector.<String>([
+			regCache.vcUsed.push(new VcRegisterLabel(vc123, data));
+			
+			var indexVa : Vector.<String> = Vector.<String>([
 				regCache.getVa(Geometry3D.SKIN_INDICES) + '.x', 
 				regCache.getVa(Geometry3D.SKIN_INDICES) + '.y', 
 				regCache.getVa(Geometry3D.SKIN_INDICES) + '.z', 
 				regCache.getVa(Geometry3D.SKIN_INDICES) + '.w'
 			]);
-			
 			var weightVa : Vector.<String> = Vector.<String>([
 				regCache.getVa(Geometry3D.SKIN_WEIGHTS) + '.x', 
 				regCache.getVa(Geometry3D.SKIN_WEIGHTS) + '.y', 
@@ -50,12 +51,12 @@ package core.shader.filter {
 			var vt6 : ShaderRegisterElement = regCache.getVt();
 
 			var vertexCode : String = '';
-
+			
 			for (var i : int = 0; i < 4; i++) {
 				// 申请vt0
 				// 取出位移信息vt0
 				// 获取vc骨骼位置偏移量
-				vertexCode += 'add ' + vt1 + '.x, ' + jointVa[i] + ', ' + vc123 + '.w \n';
+				vertexCode += 'add ' + vt1 + '.x, ' + indexVa[i] + ', ' + vc123 + '.w \n';
 				vertexCode += 'mov ' + vt0 + ', vc[' + vt1 + '.x' + '] \n';
 				// 取出四元数 vt1 = 四元数
 				vertexCode += 'mov ' + vt1 + ', vc[' + vt1 + '.x' + '+1] \n';
@@ -122,7 +123,7 @@ package core.shader.filter {
 					vertexCode += 'add ' + regCache.op + ', ' + regCache.op + ', ' + vt0 + ' \n';
 				}
 			}
-
+			
 			regCache.removeVt(vt0);
 			regCache.removeVt(vt1);
 			regCache.removeVt(vt2);

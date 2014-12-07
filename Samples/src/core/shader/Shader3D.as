@@ -36,6 +36,7 @@ package core.shader {
 		
 		public  var name 			: String;
 		private var regCache 		: ShaderRegisterCache;					// 寄存器
+		private var _filters 		: Vector.<Filter3D>;						// filters
 		private var _program 		: Program3D;								// GPU指令
 		private var _scene 			: Scene3D;								// scene
 		private var _depthPass		: Shader3D;								// 深度shader
@@ -47,7 +48,6 @@ package core.shader {
 		private var _blendMode 		: String = BLEND_NONE;					// 混合模式
 		private var _stateDirty		: Boolean = false;						// GPU状态
 		private var _programDirty	: Boolean = true;						// GPU指令
-		private var _filters 		: Vector.<Filter3D>;						// filters
 		private var _disposed		: Boolean = false;						// 是否已经被dispose
 		
 		/**
@@ -87,7 +87,7 @@ package core.shader {
 		 */
 		public function set cullFace(value:String):void {
 			_cullFace = value;
-			_stateDirty = true;
+			this.validateState();
 		}
 
 		/** 深度测试条件 */
@@ -100,7 +100,7 @@ package core.shader {
 		 */
 		public function set depthCompare(value:String):void {
 			_depthCompare = value;
-			_stateDirty	= true;
+			this.validateState();
 		}
 
 		/** 深度测试 */
@@ -113,7 +113,7 @@ package core.shader {
 		 */
 		public function set depthWrite(value:Boolean):void {
 			_depthWrite = value;
-			_stateDirty = true;
+			this.validateState();
 		}
 
 		/** 混合模式->destFactor */
@@ -126,7 +126,7 @@ package core.shader {
 		 */
 		public function set destFactor(value:String):void {
 			_destFactor 	= value;
-			_stateDirty	= true;
+			this.validateState();
 		}
 
 		/** 混合模式->sourceFactor */
@@ -139,7 +139,7 @@ package core.shader {
 		 */
 		public function set sourceFactor(value:String):void {
 			_sourceFactor = value;
-			_stateDirty = true;
+			this.validateState();
 		}
 				
 		/**
@@ -219,22 +219,21 @@ package core.shader {
 			if (scene.context != null) {
 				this.context3DEvent();
 			}
-			// 设备丢失然后重建
 			scene.addEventListener(Event.CONTEXT3D_CREATE, context3DEvent);
 		}
-		
+				
 		/**
 		 * 创建program程序并上传 
 		 * @param e
 		 * 
 		 */		
 		private function context3DEvent(e : Event = null) : void {
-			// 上传filter相关资源
+			// build
+			this.build();
+			// upload filters
 			for each (var filter : Filter3D in filters) {
 				filter.upload(scene);
 			}
-			// 创建program程序
-			this.build();
 		}
 		
 		/**
@@ -267,9 +266,12 @@ package core.shader {
 				trace(fragCode);
 				trace('---------程序结束------------');
 			}
+			if (this._program != null) {
+				this._program.dispose();
+				this._program = null;
+			}
 			// 创建program
-			if (this._program == null)
-				this._program = scene.context.createProgram();
+			this._program = scene.context.createProgram();
 			// 上传指令
 			this._program.upload(vertexAgal.agalcode, fragAgal.agalcode);
 			this._programDirty = false;
@@ -282,6 +284,7 @@ package core.shader {
 		 */
 		private function buildFragmentCode() : String {
 			var code : String = "";
+			code += "mov " + regCache.oc + ", " + regCache.fc0123 + ".yyyy \n";
 			for each (var filter : Filter3D in filters) {
 				code += filter.getFragmentCode(regCache);
 			}
@@ -298,6 +301,7 @@ package core.shader {
 			for each (var filter : Filter3D in filters) {
 				code += filter.getVertexCode(regCache);
 			}
+			// V
 			var length : int = regCache.varys.length;
 			for (var i:int = 0; i < length; i++) {
 				var vary : ShaderRegisterElement = regCache.varys[i];
@@ -308,7 +312,7 @@ package core.shader {
 			code += "m44 op, " + regCache.op + ", " + regCache.vcMvp + " \n";
 			return code;
 		}
-				
+		
 		/**
 		 * 绘制 
 		 * @param pivot			3d显示对象
@@ -330,6 +334,9 @@ package core.shader {
 				context.setBlendFactors(sourceFactor, destFactor);
 				context.setDepthTest(depthWrite, depthCompare);
 				context.setCulling(cullFace);
+			}
+			for each (var filter : Filter3D in filters) {
+				filter.update();
 			}
 			// 设置program
 			context.setProgram(_program);
@@ -383,15 +390,12 @@ package core.shader {
 					context.setVertexBufferAt(va.index, subGeo.vertexBuffer, subGeo.offsets[i], subGeo.formats[i]);
 				}
 			}
-			
 			// mvp单独设置
 			context.setProgramConstantsFromMatrix(Context3DProgramType.VERTEX, regCache.vcMvp.index, Device3D.worldViewProj, true);
-			
+			// bone
 			if (regCache.hasBone) {
-//				context.setProgramConstantsFromVector(Context3DProgramType.VERTEX, regCache.boneVcs.index, Device3D.bonesMatrices, -1);
 				context.setProgramConstantsFromByteArray(Context3DProgramType.VERTEX, regCache.boneVcs.index, Device3D.boneNum * 2, Device3D.bonesMatrices, 0);
 			}
-			
 			// 设置vc
 			for each (var vcLabel : VcRegisterLabel in regCache.vcUsed) {
 				if (vcLabel.vector != null) {
@@ -405,7 +409,6 @@ package core.shader {
 					context.setProgramConstantsFromByteArray(Context3DProgramType.VERTEX, vcLabel.vc.index, vcLabel.num, vcLabel.bytes, 0);
 				}
 			}
-			
 			// 设置fc
 			for each (var fcLabel : FcRegisterLabel in regCache.fcUsed) {
 				if (fcLabel.vector != null) {
@@ -506,6 +509,7 @@ package core.shader {
 			} else {
 				this.cullFace = Context3DTriangleFace.BACK;
 			}
+			this.validateState();
 		}
 		
 		/**
@@ -551,6 +555,18 @@ package core.shader {
 					this.sourceFactor 	= Context3DBlendFactor.SOURCE_ALPHA;
 					this.destFactor 		= Context3DBlendFactor.ONE_MINUS_SOURCE_ALPHA;
 					break;
+			}
+			this.validateState();
+		}
+		
+		private function validateState() : void {
+			this._stateDirty = true;
+			if (this.sourceFactor 	== Device3D.defaultSourceFactor 	&&
+				this.destFactor		== Device3D.defaultDestFactor	&&
+				this.depthCompare	== Device3D.defaultCompare		&&
+				this.depthWrite		== Device3D.defaultDepthWrite	&&
+				this.cullFace		== Device3D.defaultCullFace) {
+				this._stateDirty = false;
 			}
 		}
 		

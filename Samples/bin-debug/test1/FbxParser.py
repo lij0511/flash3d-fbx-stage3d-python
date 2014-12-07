@@ -98,7 +98,8 @@ ANIM_TYPE   = ".anim"
 CAMERA_TYPE = ".camera"
 SCENE_TYPE  = ".scene"
 # 翻转
-AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(  0, 180, 0), FbxVector4(-1, 1, 1))
+AXIS_FLIP_L = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(-90, 0, 0),  FbxVector4(1, -1, 1))
+AXIS_FLIP_X = FbxAMatrix(FbxVector4(0, 0, 0), FbxVector4(-180, 0, 0), FbxVector4(1, -1, 1))
 # 最大权重数量
 MAX_WEIGHT_NUM = 4
 # 最大顶点数
@@ -113,17 +114,17 @@ def parseArgument():
     
     parser = argparse.ArgumentParser()
     # 解析法线
-    parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = False)
+    parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = True)
     # 解析切线
-    parser.add_argument("-tangent", help = "parse tangent",     action = "store_true",      default = False)
+    parser.add_argument("-tangent", help = "parse tangent",     action = "store_true",      default = True)
     # 解析UV0
     parser.add_argument("-uv0",     help = "parse uv0",         action = "store_true",      default = True)
     # 解析UV1
-    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = False)
+    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = True)
     # 解析动画
     parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = True)
     # 使用全局坐标
-    parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = True)
+    parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = False)
     # 指定Fbx文件路径
     parser.add_argument("-path",    help = "fbx file path  ",   action = "store",           default = "")
     # 使用四元数方式
@@ -340,7 +341,7 @@ class Camera3D(object):
         frameTime.SetTime(0, 0, 0, 1, 0, self.scene.GetGlobalSettings().GetTimeMode())
         # 解析每一帧动画
         while time <= timeSpan.GetStop():
-            animMt = AXIS_FLIP_L * self.fbxCamera.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
+            animMt = AXIS_FLIP_X * self.fbxCamera.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
             matrix = Matrix3D(animMt)
             clip   = []
             # 丢弃最后一列数据
@@ -376,7 +377,7 @@ class Camera3D(object):
         self.bytes += struct.pack('<f', self.far)               # far
         self.bytes += struct.pack('<f', self.fieldOfView)       # fieldOfView
         # 保存相机当前位置
-        animMt = AXIS_FLIP_L * self.fbxCamera.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+        animMt = AXIS_FLIP_X * self.fbxCamera.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
         matrix = Matrix3D(animMt)
         # 丢弃最后一列数据
         for i in range(3):
@@ -557,13 +558,13 @@ class Mesh(object):
         self.invAxisTransform = self.invAxisTransform.Inverse()
             
         if config.world:
-            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform
+            self.transform = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
             pass
         else:
-            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+            self.transform = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.invAxisTransform
             pass
         
-        printFBXAMatrix("\tGlobal Matrix:", self.transform)
+        printFBXAMatrix("\tTransform Matrix:", self.transform)
             
         pass # end func
     
@@ -646,9 +647,9 @@ class Mesh(object):
             v0 = self.vertices[i * 3 + 0]
             v1 = self.vertices[i * 3 + 1]
             v2 = self.vertices[i * 3 + 2]
-            self.vertices[i * 3 + 0] = v0
-            self.vertices[i * 3 + 1] = v2
-            self.vertices[i * 3 + 2] = v1
+            self.vertices[i * 3 + 0] = v2
+            self.vertices[i * 3 + 1] = v1
+            self.vertices[i * 3 + 2] = v0
             pass # end for
         # 解析包围盒
         self.parseBounds()
@@ -698,9 +699,9 @@ class Mesh(object):
                 v0 = self.uvs0[i * 3 + 0]
                 v1 = self.uvs0[i * 3 + 1]
                 v2 = self.uvs0[i * 3 + 2]
-                self.uvs0[i * 3 + 0] = v0
-                self.uvs0[i * 3 + 1] = v2
-                self.uvs0[i * 3 + 2] = v1
+                self.uvs0[i * 3 + 0] = v2
+                self.uvs0[i * 3 + 1] = v1
+                self.uvs0[i * 3 + 2] = v0
                 pass # end for
             pass # end if
         pass # end func
@@ -748,9 +749,9 @@ class Mesh(object):
                 v0 = self.uvs1[i * 3 + 0]
                 v1 = self.uvs1[i * 3 + 1]
                 v2 = self.uvs1[i * 3 + 2]
-                self.uvs1[i * 3 + 0] = v0
-                self.uvs1[i * 3 + 1] = v2
-                self.uvs1[i * 3 + 2] = v1
+                self.uvs1[i * 3 + 0] = v2
+                self.uvs1[i * 3 + 1] = v1
+                self.uvs1[i * 3 + 2] = v0
                 pass # end for
             pass # end if
         pass # end func
@@ -781,9 +782,9 @@ class Mesh(object):
             v0 = self.normals[i * 3 + 0]
             v1 = self.normals[i * 3 + 1]
             v2 = self.normals[i * 3 + 2]
-            self.normals[i * 3 + 0] = v0
-            self.normals[i * 3 + 1] = v2
-            self.normals[i * 3 + 2] = v1
+            self.normals[i * 3 + 0] = v2
+            self.normals[i * 3 + 1] = v1
+            self.normals[i * 3 + 2] = v0
             pass # end for
         pass # end func
     
@@ -798,7 +799,7 @@ class Mesh(object):
         tangents = self.fbxMesh.GetLayer(0).GetTangents()
         count    = tangents.GetDirectArray().GetCount()
         data     = tangents.GetDirectArray()
-        print("\t tangent num:%d" % count)
+        print("\ttangent num:%d" % count)
         for i in range(count):
             self.tangents.append(data.GetAt(i))
             pass
@@ -818,9 +819,9 @@ class Mesh(object):
             v0 = self.tangents[i * 3 + 0]
             v1 = self.tangents[i * 3 + 1]
             v2 = self.tangents[i * 3 + 2]
-            self.tangents[i * 3 + 0] = v0
-            self.tangents[i * 3 + 1] = v2
-            self.tangents[i * 3 + 2] = v1
+            self.tangents[i * 3 + 0] = v2
+            self.tangents[i * 3 + 1] = v1
+            self.tangents[i * 3 + 2] = v0
             pass # end for
         pass # end func
     
@@ -865,9 +866,9 @@ class Mesh(object):
             v0 = self.weightsAndIndices[i * 3 + 0]
             v1 = self.weightsAndIndices[i * 3 + 1]
             v2 = self.weightsAndIndices[i * 3 + 2]
-            self.weightsAndIndices[i * 3 + 0] = v0
-            self.weightsAndIndices[i * 3 + 1] = v2
-            self.weightsAndIndices[i * 3 + 2] = v1
+            self.weightsAndIndices[i * 3 + 0] = v2
+            self.weightsAndIndices[i * 3 + 1] = v1
+            self.weightsAndIndices[i * 3 + 2] = v0
             pass # end for
         
         pass # end func
@@ -944,7 +945,7 @@ class Mesh(object):
                 transform   = boneNode.EvaluateGlobalTransform(time)
                 invTansform = FbxAMatrix(AXIS_FLIP_L)
                 invTansform = invTansform.Inverse()
-                transform   = AXIS_FLIP_L * transform * invTansform
+                transform   = AXIS_FLIP_X * transform * invTansform
                 self.mounts[boneName].append(transform)
                 pass # end in mount
             pass # end for
@@ -953,7 +954,7 @@ class Mesh(object):
     # 解析帧动画
     def parseFrameAnim(self, time):
         # 顶点 * axis * [axis的逆矩阵 * global * axis]
-        animMt = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
+        animMt = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
         matrix = Matrix3D(animMt)
         clip   = []
         # 丢弃最后一列数据
@@ -1196,7 +1197,6 @@ class Mesh(object):
         for subMesh in subMeshes:
             self.geometries += subMesh.splitBones()
             pass
-        print(len(self.geometries))
         pass # end func
     
     # 拆分顶点数据:vertex,uv0,uv1,normal,weightsAndIndices

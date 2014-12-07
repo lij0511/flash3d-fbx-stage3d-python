@@ -78,12 +78,11 @@ package {
 			mesh.addChild(weapon);
 			mesh.addEventListener("exitFrame", onSkeletonMeshexitFrame);
 		}
-		
+		 
 		protected function onSkeletonMeshexitFrame(event:Event) : void {
 			var mesh : Mesh3D = event.target as Mesh3D;
 			var render : SkeletonRender = mesh.render as SkeletonRender;
 			weapon.transform.copyFrom(render.getMount("weapon", int(mesh.currentFrame)));
-			weapon.updateTransforms(true);
 		}
 		
 		protected function onLoadCamera(event:CameraEvent) : void {

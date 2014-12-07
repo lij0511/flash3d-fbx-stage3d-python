@@ -134,7 +134,7 @@ def parseArgument():
     # 使用矩阵时，最大骨骼数
     parser.add_argument("-max_m34", help = "bone num with m34", action = "store",           default = 36)
     # 挂节点
-    parser.add_argument("-mount",  help = "mount bone, split by ','",    action = "store",  default = "weapon")
+    parser.add_argument("-mount",  help = "mount bone, split by ','",    action = "store",  default = "Bone001")
     
     option = parser.parse_args()
     option.mount = option.mount.split(",")
@@ -341,7 +341,7 @@ class Camera3D(object):
         frameTime.SetTime(0, 0, 0, 1, 0, self.scene.GetGlobalSettings().GetTimeMode())
         # 解析每一帧动画
         while time <= timeSpan.GetStop():
-            animMt = AXIS_FLIP_L * self.fbxCamera.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
+            animMt = AXIS_FLIP_X * self.fbxCamera.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
             matrix = Matrix3D(animMt)
             clip   = []
             # 丢弃最后一列数据
@@ -377,7 +377,7 @@ class Camera3D(object):
         self.bytes += struct.pack('<f', self.far)               # far
         self.bytes += struct.pack('<f', self.fieldOfView)       # fieldOfView
         # 保存相机当前位置
-        animMt = AXIS_FLIP_L * self.fbxCamera.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+        animMt = AXIS_FLIP_X * self.fbxCamera.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
         matrix = Matrix3D(animMt)
         # 丢弃最后一列数据
         for i in range(3):
@@ -799,7 +799,7 @@ class Mesh(object):
         tangents = self.fbxMesh.GetLayer(0).GetTangents()
         count    = tangents.GetDirectArray().GetCount()
         data     = tangents.GetDirectArray()
-        print("\t tangent num:%d" % count)
+        print("\ttangent num:%d" % count)
         for i in range(count):
             self.tangents.append(data.GetAt(i))
             pass
@@ -945,7 +945,7 @@ class Mesh(object):
                 transform   = boneNode.EvaluateGlobalTransform(time)
                 invTansform = FbxAMatrix(AXIS_FLIP_L)
                 invTansform = invTansform.Inverse()
-                transform   = AXIS_FLIP_L * transform * invTansform
+                transform   = AXIS_FLIP_X * transform * invTansform
                 self.mounts[boneName].append(transform)
                 pass # end in mount
             pass # end for
@@ -954,7 +954,7 @@ class Mesh(object):
     # 解析帧动画
     def parseFrameAnim(self, time):
         # 顶点 * axis * [axis的逆矩阵 * global * axis]
-        animMt = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
+        animMt = AXIS_FLIP_X * self.fbxMesh.GetNode().EvaluateGlobalTransform(time) * self.invAxisTransform
         matrix = Matrix3D(animMt)
         clip   = []
         # 丢弃最后一列数据
@@ -1197,7 +1197,6 @@ class Mesh(object):
         for subMesh in subMeshes:
             self.geometries += subMesh.splitBones()
             pass
-        print(len(self.geometries))
         pass # end func
     
     # 拆分顶点数据:vertex,uv0,uv1,normal,weightsAndIndices
