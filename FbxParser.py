@@ -569,8 +569,7 @@ class Mesh(object):
 #         printFBXAMatrix("\tGlobal    Matrix:", AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform)
         
         printFBXAMatrix("\tGeometry  Matrix:", self.geometryTransform)
-        printFBXAMatrix("\tLocal     Matrix:", self.transform)
-        printFBXAMatrix("\tGlobal    Matrix:", AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform)
+        printFBXAMatrix("\tTransform Matrix:", self.transform)
         
         pass # end func
     
