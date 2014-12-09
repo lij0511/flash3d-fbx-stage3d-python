@@ -123,7 +123,7 @@ def parseArgument():
     # 解析动画
     parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = True)
     # 使用全局坐标
-    parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = True)
+    parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = False)
     # 指定Fbx文件路径
     parser.add_argument("-path",    help = "fbx file path  ",   action = "store",           default = "")
     # 使用四元数方式
@@ -561,7 +561,7 @@ class Mesh(object):
             self.transform = FbxAMatrix()
             pass
         else:
-            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform
+            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.geometryTransform * self.invAxisTransform
             pass
         
 #         printFBXAMatrix("\tGeometry  Matrix:", self.geometryTransform)
