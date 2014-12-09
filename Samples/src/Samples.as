@@ -82,7 +82,7 @@ package {
 		protected function onSkeletonMeshexitFrame(event:Event) : void {
 			var mesh : Mesh3D = event.target as Mesh3D;
 			var render : SkeletonRender = mesh.render as SkeletonRender;
-			weapon.transform.copyFrom(render.getMount("weapon", int(mesh.currentFrame)));
+			weapon.transform.copyFrom(render.getMount("weapon_b", int(mesh.currentFrame)));
 		}
 		
 		protected function onLoadCamera(event:CameraEvent) : void {
