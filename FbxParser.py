@@ -3,63 +3,9 @@
 ''' 
 FBX:
     Fbx文件名、路径名以及3D场景中所有物体建议不要使用中文名称。
-
-Mesh文件读取格式:
-    小头、解压
-    size = readInt()                名称长度
-    name = readreadUTFBytes(size)   名称
-    mat  = readBytes(3 * 4 * 4)     3列4行矩阵，一共12个元素，每个元素使用float类型
-    size = readInt()                SubMesh数量
-        count = readInt()           SubMesh顶点长度
-        readBytes(count * 3 * 4)    SubMesh顶点数据，顶点数据一定存在，每个顶点三个数据x,y,z，使用float类型
-        count = readInt()           SubMesh uv0长度
-        readBytes(count * 2 * 4)    SubMesh uv0数据，uv0数据不一定存在，每个顶点两个数据u,v，使用float类型
-        count = readInt()           SubMesh uv1长度
-        readBytes(count * 2 * 4)    SubMesh uv1数据，uv0数据不一定存在，每个顶点两个数据u,v，使用float类型
-        count = readInt()           SubMesh 法线长度
-        readBytes(count * 3 * 4)    SubMesh 法线数据，每个顶点三个数据x,y,z，使用float类型
-        count = readInt()           SubMesh 权重长度
-        readBytes(count * 4 * 4)    SubMesh 权重数据，每个顶点四个数据，使用float类型。权重为骨骼系统权重值
-        count = readInt()           SubMesh 骨骼索引长度
-        readBytes(count * 4 * 4)    SubMesh 骨骼索引数据，每个顶点四个数据，使用float类型。索引为骨骼系统骨骼索引。受限于寄存器数量，因此骨骼索引可以使用ushort存放，可以修改脚本相应位置以便减少文件体积
-        重复读取SubMesh直到读取完所有SubMesh
-    readBytes(6 * 4)                Mesh包围盒数据、一共6个，使用float类型
-
-
-Anim文件读取格式:
-    动画文件分为帧动画和骨骼动画。
-    小头、解压
-    type = readInt()
-    type为
-        0:帧动画
-            count = readInt()                                帧数
-            readBytes(count * 3 * 4 * 4)                     所有帧数矩阵数据，矩阵数据为3列4行，float类型
-        1:矩阵类型骨骼动画
-            count = readInt()                                SubMesh数量
-                frameNum = readInt()                         SubMesh帧数
-                boneNum  = readInt()                         SubMesh骨骼数量
-                readBytes(frameNum * boneNum * 3 * 4 * 4)    SubMesh骨骼动画数据，float类型。保存每一帧的所有骨骼当前帧的矩阵数据，矩阵数据为3列4行
-                重复读取SubMesh
-        2:四元数类型骨骼动画
-            count = readInt()                                SubMesh数量
-                frameNum = readInt()                         SubMesh帧数
-                boneNum  = readInt()                         SubMesh骨骼数量
-                readBytes(frameNum * boneNum * 2 * 4 * 4)    SubMesh骨骼动画数据，float类型。保存每一帧的所有骨骼当前的位移以及四元数数据，位移四个，四元数四个
-
-Camera文件读取格式:
-    小头、解压
-    size = readInt()            相机名称长度
-    readreadUTFBytes(size)      相机名称
-    readFloat()                 视口宽度
-    readFloat()                 视口高度
-    readFloat()                 相机Near
-    readFloat()                 相机Far
-    readFloat()                 相机fieldOfView
-    readBytes(3 * 4 * 4)        相机矩阵，矩阵为3列四行，float类型
-    size = readInt()            相机动画帧数
-    readBytes(size * 3 * 4 * 4) 相机动画，相机动画使用3列四行矩阵，数据类型为float
-
-
+    
+文件格式参考Samples
+    
 解析参数说明:
     
     -normal      解析法线，默认不解析
@@ -75,15 +21,16 @@ Camera文件读取格式:
 '''
 
 from FbxCommon import *
+from platform import system
 from string import count
+import logging
 import argparse
 import json
 import os
 import re
 import struct
-import zlib
 import sys
-from platform import system
+import zlib
 
 # object
 class LObject(object):
@@ -109,31 +56,33 @@ config = LObject()
 # 解析命令行参数
 def parseArgument():
 
-    print("parse arguments...")
+    logging.info("parse arguments...")
     
     parser = argparse.ArgumentParser()
     # 解析法线
-    parser.add_argument("-normal",  help = "parse normal",      action = "store_true",      default = True)
+    parser.add_argument("-normal",  help = "parse normal",              action = "store_true",      default = False)
     # 解析切线
-    parser.add_argument("-tangent", help = "parse tangent",     action = "store_true",      default = True)
+    parser.add_argument("-tangent", help = "parse tangent",             action = "store_true",      default = False)
     # 解析UV0
-    parser.add_argument("-uv0",     help = "parse uv0",         action = "store_true",      default = True)
+    parser.add_argument("-uv0",     help = "parse uv0",                 action = "store_true",      default = False)
     # 解析UV1
-    parser.add_argument("-uv1",     help = "parse uv1",         action = "store_true",      default = True)
+    parser.add_argument("-uv1",     help = "parse uv1",                 action = "store_true",      default = False)
     # 解析动画
-    parser.add_argument("-anim",    help = "parse animation",   action = "store_true",      default = True)
+    parser.add_argument("-anim",    help = "parse animation",           action = "store_true",      default = False)
+    # 使用geometry坐标
+    parser.add_argument("-geomtry", help = "geometry transform",        action = "store_true",      default = False)
     # 使用全局坐标
-    parser.add_argument("-world",   help = "world Transofrm",   action = "store_true",      default = False)
+    parser.add_argument("-world",   help = "world Transofrm",           action = "store_true",      default = False)
     # 指定Fbx文件路径
-    parser.add_argument("-path",    help = "fbx file path  ",   action = "store",           default = "")
+    parser.add_argument("-path",    help = "fbx file path  ",           action = "store",           default = "")
     # 使用四元数方式
-    parser.add_argument("-quat",    help = "quat with anima",   action = "store_true",      default = True)
+    parser.add_argument("-quat",    help = "quat with anima",           action = "store_true",      default = True)
     # 使用四元数时，最大骨骼数
-    parser.add_argument("-max_quat",help = "bone num with quat",action = "store",           default = 56)
+    parser.add_argument("-max_quat",help = "bone num with quat",        action = "store",           default = 56)
     # 使用矩阵时，最大骨骼数
-    parser.add_argument("-max_m34", help = "bone num with m34", action = "store",           default = 36)
+    parser.add_argument("-max_m34", help = "bone num with m34",         action = "store",           default = 36)
     # 挂节点
-    parser.add_argument("-mount",  help = "mount bone, split by ','",    action = "store",  default = "Bone001")
+    parser.add_argument("-mount",  help = "mount bone, split by ','",   action = "store",  default = "Bone001")
     
     option = parser.parse_args()
     option.mount = option.mount.split(",")
@@ -160,7 +109,7 @@ def scanFbxFiles(args):
         fbxList.append(sourceDir)
         pass
     else:
-        print("scane current directory:%s" % sourceDir)
+        logging.info("scane current directory:%s" % sourceDir)
         for parentDir, _, fileNames in os.walk(sourceDir):
             for fileName in fileNames:
                 if fileName.endswith('FBX') or fileName.endswith('fbx'):
@@ -171,7 +120,7 @@ def scanFbxFiles(args):
         pass
     # 打印
     for item in fbxList:
-        print("find fbx file: %s" % item)
+        logging.info("find fbx file: %s" % item)
         pass
     return fbxList
     pass # end func
@@ -270,9 +219,10 @@ def getQuatBytesFromAMatrix(fbxAMatrix):
 
 # 打印矩阵
 def printFBXAMatrix(sstr, transform):
-    print("%s TX:%f\tTY:%f\tTZ:%f" % (sstr, transform.GetT()[0], transform.GetT()[1], transform.GetT()[2]))
-    print("%s RX:%f\tRY:%f\tRZ:%f" % (sstr, transform.GetR()[0], transform.GetR()[1], transform.GetR()[2]))
-    print("%s SX:%f\tSY:%f\tSZ:%f" % (sstr, transform.GetS()[0], transform.GetS()[1], transform.GetS()[2]))
+    logging.info("%s TX:%f\tTY:%f\tTZ:%f" % (sstr, transform.GetT()[0], transform.GetT()[1], transform.GetT()[2]))
+    logging.info("%s RX:%f\tRY:%f\tRZ:%f" % (sstr, transform.GetR()[0], transform.GetR()[1], transform.GetR()[2]))
+    logging.info("%s SX:%f\tSY:%f\tSZ:%f" % (sstr, transform.GetS()[0], transform.GetS()[1], transform.GetS()[2]))
+    logging.info("%s RawData:%s" % (sstr, str(Matrix3D(transform).rawData)))
     pass # end func
 
 # 解析FBX文件目录
@@ -316,11 +266,11 @@ class Camera3D(object):
         self.far         = self.fbxCamera.FarPlane.Get()
         self.fieldOfView = self.fbxCamera.FieldOfView.Get()
         
-        print("\tAspect Width: %f" % self.aspectWidth)
-        print("\tAspect Height:%f" % self.aspectHeight)
-        print("\tNear         :%f" % self.near)
-        print("\tFar          :%f" % self.far)
-        print("\tFieldOfView  :%f" % self.fieldOfView)
+        logging.info("\tAspect Width: %f" % self.aspectWidth)
+        logging.info("\tAspect Height:%f" % self.aspectHeight)
+        logging.info("\tNear         :%f" % self.near)
+        logging.info("\tFar          :%f" % self.far)
+        logging.info("\tFieldOfView  :%f" % self.fieldOfView)
         
         pass # end func
     
@@ -403,7 +353,7 @@ class Camera3D(object):
     
     # 通过FBXCamera初始化相机
     def initWithFbxCamera(self, fbxCamera, sdkManager, scene, filepath):
-        print("parse camera...")
+        logging.info("parse camera...")
         self.fbxCamera   = fbxCamera
         self.sdkManager  = sdkManager
         self.scene       = scene
@@ -414,7 +364,7 @@ class Camera3D(object):
         self.invAxisTransform.Inverse()
         # 相机名称
         self.name = str(fbxCamera.GetNode().GetName())
-        print("\t%s" % self.name)
+        logging.info("\t%s" % self.name)
         # 解析相机属性
         self.parseCameraProperties()
         # 解析相机动画
@@ -490,7 +440,8 @@ class Material(object):
             count = prop.GetSrcObjectCount(FbxTexture.ClassId)
             for j in range(count):
                 texture = prop.GetSrcObject(FbxTexture.ClassId, j)
-                self.textureName = str(texture.GetFileName())
+#                 self.textureName = str(texture.GetFileName())
+                self.textureName = ""
                 pass
             pass
         # 解析文件名
@@ -544,40 +495,41 @@ class Mesh(object):
     
     # 解析矩阵
     def parseTransform(self):
-        print("\tparse transform...")
+        logging.info("\tparse transform...")
         self.geometryTransform  = GetGeometryTransform(self.fbxMesh.GetNode())
-        
-        if config.world:
+        # 当geometry启用时，world将会失效
+        if config.geomtry:
+            self.axisTransform = AXIS_FLIP_L * self.geometryTransform
+            pass
+        elif config.world:
             self.axisTransform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.geometryTransform
             pass
         else:
             self.axisTransform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateLocalTransform() * self.geometryTransform
             pass
-        
+        # invert axis transform
         self.invAxisTransform = FbxAMatrix(self.axisTransform)
         self.invAxisTransform = self.invAxisTransform.Inverse()
-        
-        if config.world:
+        # 启用geometry
+        if config.geomtry:
+            self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.geometryTransform * self.invAxisTransform
+            pass
+        elif config.world:
             self.transform = FbxAMatrix()
             pass
         else:
             self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.geometryTransform * self.invAxisTransform
             pass
         
-#         printFBXAMatrix("\tGeometry  Matrix:", self.geometryTransform)
-#         printFBXAMatrix("\tTransform Matrix:", self.transform)
-#         printFBXAMatrix("\tGlobal    Matrix:", AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.invAxisTransform)
-        
-        printFBXAMatrix("\tGeometry  Matrix:", self.geometryTransform)
         printFBXAMatrix("\tTransform Matrix:", self.transform)
         
         pass # end func
     
     # 解析索引
     def parseIndices(self):
-        print("\tparse indices...")
+        logging.info("\tparse indices...")
         count = self.fbxMesh.GetPolygonCount()
-        print("\ttriangle num:%d" % (count))
+        logging.info("\ttriangle num:%d" % (count))
         for i in range(count):
             for j in range(3):
                 # 顶点索引
@@ -617,12 +569,12 @@ class Mesh(object):
                 self.bounds.max[2] = vert[2]
                 pass
             pass # end func
-        print("\tbounds:Min[%f %f %f] Max:[%f %f %f]" % (self.bounds.min[0], self.bounds.min[1], self.bounds.min[2], self.bounds.max[0], self.bounds.max[1], self.bounds.max[2]))
+        logging.info("\tbounds:Min[%f %f %f] Max:[%f %f %f]" % (self.bounds.min[0], self.bounds.min[1], self.bounds.min[2], self.bounds.max[0], self.bounds.max[1], self.bounds.max[2]))
         pass # end func
     
     # 解析顶点
     def parseVertices(self):
-        print("\tparse vertex...")
+        logging.info("\tparse vertex...")
         count = self.fbxMesh.GetControlPointsCount()
         points= self.fbxMesh.GetControlPoints()
         for i in range(count):
@@ -638,7 +590,7 @@ class Mesh(object):
             vertices.append(vert)
             pass
         self.vertices = vertices
-        print("\tvetex num:%d" % (len(self.vertices)))
+        logging.info("\tvetex num:%d" % (len(self.vertices)))
         # 对顶点坐标轴转换
         count = len(self.vertices)
         for i in range(count):
@@ -665,7 +617,7 @@ class Mesh(object):
         layerCount = self.fbxMesh.GetLayerCount()
         # 解析UV0
         if layerCount >= 1:
-            print("\tparse UV0...")
+            logging.info("\tparse UV0...")
             uvs   = self.fbxMesh.GetLayer(0).GetUVs()
             data  = uvs.GetDirectArray()
             polygonCount = self.fbxMesh.GetPolygonCount()
@@ -696,7 +648,7 @@ class Mesh(object):
                     vertIdx += 1
                     pass # end for polygon size
                 pass # end for polygon count
-            print("\tUV0 num:%d" % (len(self.uvs0)))
+            logging.info("\tUV0 num:%d" % (len(self.uvs0)))
             # 重构uv0索引顺序
             count = len(self.uvs0)
             count = count / 3
@@ -715,7 +667,7 @@ class Mesh(object):
     def parseUV1(self):
         layerCount = self.fbxMesh.GetLayerCount()
         if layerCount >= 2:
-            print("\tparse UV1...")
+            logging.info("\tparse UV1...")
             uvs   = self.fbxMesh.GetLayer(1).GetUVs()
             data  = uvs.GetDirectArray()
             polygonCount = self.fbxMesh.GetPolygonCount()
@@ -746,7 +698,7 @@ class Mesh(object):
                     vertIdx += 1
                     pass # end for
                 pass # end for
-            print("\tUV1 num:%d" % (len(self.uvs1)))
+            logging.info("\tUV1 num:%d" % (len(self.uvs1)))
             # 重构uv1索引顺序
             count = len(self.uvs1)
             count = count / 3
@@ -763,14 +715,41 @@ class Mesh(object):
     
     # 解析法线
     def parseNormals(self):
-        print("\tparse normals...")
+        logging.info("\tparse normals...")
         normals = self.fbxMesh.GetLayer(0).GetNormals()
-        count   = normals.GetDirectArray().GetCount()
-        print("\tnormal num:%d" % (count))
-        data    = normals.GetDirectArray()
-        for i in range(count):
-            self.normals.append(data.GetAt(i))
+        if not normals:
+            return
             pass
+        data = normals.GetDirectArray()
+        polygonCount = self.fbxMesh.GetPolygonCount()
+        vertIdx = 0
+        for i in range(polygonCount):
+            for j in range(3):
+                controlPointIndex = self.fbxMesh.GetPolygonVertex(i, j)
+                # by point
+                if normals.GetMappingMode() == FbxLayerElement.eByControlPoint:
+                    if normals.GetReferenceMode() == FbxLayerElement.eDirect:
+                        nrm = data.GetAt(controlPointIndex)
+                        pass
+                    elif normals.GetReferenceMode() == FbxLayerElement.eIndexToDirect:
+                        idx = normals.GetIndexArray().GetAt(controlPointIndex)
+                        nrm = data.GetAt(idx)
+                        pass
+                    pass # end if
+                elif normals.GetMappingMode() == FbxLayerElement.eByPolygonVertex:
+                    if normals.GetReferenceMode() == FbxLayerElement.eDirect:
+                        nrm = data.GetAt(vertIdx)
+                        pass #end
+                    elif normals.GetReferenceMode() == FbxLayerElement.eIndexToDirect:
+                        idx = normals.GetIndexArray().GetAt(vertIdx)
+                        nrm = data.GetAt(idx)
+                        pass
+                    pass # end
+                self.normals.append(nrm)
+                vertIdx += 1
+                pass # end for
+            pass # end for
+        
         # 对法线进行转换
         count = len(self.normals)
         axis  = Matrix3D(self.axisTransform)
@@ -795,7 +774,7 @@ class Mesh(object):
     
     # 解析切线
     def parseTangent(self):  
-        print("\tparse tangents...")
+        logging.info("\tparse tangents...")
         if not config.normal:
             self.parseNormals()
             pass
@@ -804,7 +783,7 @@ class Mesh(object):
         tangents = self.fbxMesh.GetLayer(0).GetTangents()
         count    = tangents.GetDirectArray().GetCount()
         data     = tangents.GetDirectArray()
-        print("\ttangent num:%d" % count)
+        logging.info("\ttangent num:%d" % count)
         for i in range(count):
             self.tangents.append(data.GetAt(i))
             pass
@@ -880,17 +859,17 @@ class Mesh(object):
     
     # 解析骨骼权重以及索引
     def parseCluster(self):   
-        print("\tparse skeleton...")
+        logging.info("\tparse skeleton...")
         skinDeformer = self.fbxMesh.GetDeformer(0, FbxDeformer.eSkin)
         clusterCount = skinDeformer.GetClusterCount()
-        print("\tmesh:[%s] has %d bones..." % (self.name, clusterCount))
+        logging.info("\tmesh:[%s] has %d bones..." % (self.name, clusterCount))
         for clusterIdx in range(clusterCount):
             cluster = skinDeformer.GetCluster(clusterIdx)
             joint   = SkeletonJoint()
             joint.initWithCluster(cluster)
             joint.index = clusterIdx
             self.joints.append(joint)
-            print("\tBoneName:%s" % joint.name)
+            logging.info("\tBoneName:%s" % joint.name)
             # 解析骨骼权重以及顶点索引
             indices = cluster.GetControlPointIndices()          # 顶点的索引
             weights = cluster.GetControlPointWeights()          # 顶点的权重
@@ -974,11 +953,11 @@ class Mesh(object):
     
     # 解析动画
     def parseAnim(self):
-        print("\tparse animation...")
+        logging.info("\tparse animation...")
         # 检测是否为骨骼动画
         skinCount = self.fbxMesh.GetDeformerCount(FbxDeformer.eSkin)
         self.skeleton = skinCount > 0
-        print("\tis skeleton:%s" % str(self.skeleton))
+        logging.info("\tis skeleton:%s" % str(self.skeleton))
         # 如果为骨骼动画，则需要事先解析骨骼
         if self.skeleton:
             self.parseCluster()
@@ -1422,19 +1401,19 @@ class Mesh(object):
     
     # 解析材质，只解析第一层材质
     def parseMaterial(self):
-        print("\tparse materials...")
+        logging.info("\tparse materials...")
         count = self.fbxMesh.GetNode().GetMaterialCount()
         if count == 0:
             return
         self.material = Material()
         self.material.initWithFbxMaterial(self.fbxMesh.GetNode().GetMaterial(0))
-        print("\ttexture:%s" % self.material.textureName)
+        logging.info("\ttexture:%s" % self.material.textureName)
         pass
     
     # 初始化mesh
     def initWithFbxMesh(self, fbxMesh, sdkManager, scene, fbxFilePath):
         
-        print("parse mesh...")
+        logging.info("parse mesh...")
         
         self.fbxMesh    = fbxMesh
         self.sdkManager = sdkManager
@@ -1442,7 +1421,7 @@ class Mesh(object):
         self.name       = str(fbxMesh.GetNode().GetName())
         self.fbxFilePath= fbxFilePath
         
-        print("\t%s" % (self.name))
+        logging.info("\t%s" % (self.name))
         # 解析矩阵
         self.parseTransform()
         # 解析索引
@@ -1484,9 +1463,9 @@ class Mesh(object):
 
 # 解析相机
 def parseCameras(sdkManager, scene, filepath):
-    print("parse cameras...")
+    logging.info("parse cameras...")
     count = scene.GetSrcObjectCount(FbxCamera.ClassId)
-    print("\tcamera num:%d" % (count))
+    logging.info("\tcamera num:%d" % (count))
     cameras = []
     for i in range(count):
         fbxCamera = scene.GetSrcObject(FbxCamera.ClassId, i)
@@ -1499,9 +1478,9 @@ def parseCameras(sdkManager, scene, filepath):
 
 # 解析所有的模型
 def parseMeshes(sdkManager, scene, filepath):
-    print("parse meshes...")
+    logging.info("parse meshes...")
     count = scene.GetSrcObjectCount(FbxMesh.ClassId)
-    print("\tmesh num:%d" % (count))
+    logging.info("\tmesh num:%d" % (count))
     meshes = []
     for i in range(count):
         fbxMesh = scene.GetSrcObject(FbxMesh.ClassId, i)
@@ -1569,14 +1548,14 @@ def writeSceneConfig(scene):
 
 # 解析FBX文件
 def parseFBX(fbxfile, config):
-    print("parse fbx file:%s" % (fbxfile))
+    logging.info("parse fbx file:%s" % (fbxfile))
     # 初始化SDKManager以及Scene
     sdkManager, scene = InitializeSdkObjects()
     # 加载FBX
     content = LoadScene(sdkManager, scene, fbxfile)
     # fbx文件装载失败
     if content == False:
-        print("Fbx load failed:%s" % fbxfile)
+        logging.info("Fbx load failed:%s" % fbxfile)
         sdkManager.Destroy()
         return
         pass
@@ -1602,6 +1581,20 @@ if __name__ == "__main__":
     
     reload(sys)
     sys.setdefaultencoding('utf8')
+    
+    # log
+    logging.basicConfig(
+                        level    = logging.DEBUG,
+                        format   = '%(asctime)s %(filename)s %(levelname)s %(message)s',
+                        datefmt  = '%a, %d %b %Y %H:%M:%S',
+                        filename = 'log.log',
+                        filemode = 'w')
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+    console.setFormatter(formatter)
+    logging.getLogger('').addHandler(console)
+    # end
     
     # 解析参数
     config = parseArgument()
