@@ -55,22 +55,22 @@ config = LObject()
 
 # 解析命令行参数
 def parseArgument():
-
+    
     logging.info("parse arguments...")
     
     parser = argparse.ArgumentParser()
     # 解析法线
-    parser.add_argument("-normal",  help = "parse normal",              action = "store_true",      default = False)
+    parser.add_argument("-normal",  help = "parse normal",              action = "store_true",      default = True)
     # 解析切线
-    parser.add_argument("-tangent", help = "parse tangent",             action = "store_true",      default = False)
+    parser.add_argument("-tangent", help = "parse tangent",             action = "store_true",      default = True)
     # 解析UV0
-    parser.add_argument("-uv0",     help = "parse uv0",                 action = "store_true",      default = False)
+    parser.add_argument("-uv0",     help = "parse uv0",                 action = "store_true",      default = True)
     # 解析UV1
-    parser.add_argument("-uv1",     help = "parse uv1",                 action = "store_true",      default = False)
+    parser.add_argument("-uv1",     help = "parse uv1",                 action = "store_true",      default = True)
     # 解析动画
-    parser.add_argument("-anim",    help = "parse animation",           action = "store_true",      default = False)
+    parser.add_argument("-anim",    help = "parse animation",           action = "store_true",      default = True)
     # 使用geometry坐标
-    parser.add_argument("-geomtry", help = "geometry transform",        action = "store_true",      default = False)
+    parser.add_argument("-geomtry", help = "geometry transform",        action = "store_true",      default = True)
     # 使用全局坐标
     parser.add_argument("-world",   help = "world Transofrm",           action = "store_true",      default = False)
     # 指定Fbx文件路径
