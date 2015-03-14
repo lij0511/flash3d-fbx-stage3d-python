@@ -71,7 +71,7 @@ def parseArgument():
     # 解析动画
     parser.add_argument("-anim",    help = "parse animation",           action = "store_true",      default = False)
     # 使用geometry坐标
-    parser.add_argument("-geomtry", help = "geometry transform",        action = "store_true",      default = False)
+    parser.add_argument("-geometry", help = "geometry transform",        action = "store_true",      default = False)
     # 使用全局坐标
     parser.add_argument("-world",   help = "world Transofrm",           action = "store_true",      default = False)
     # 指定Fbx文件路径
@@ -488,7 +488,7 @@ class Mesh(object):
         logging.info("\tparse transform...")
         self.geometryTransform  = GetGeometryTransform(self.fbxMesh.GetNode())
         # 当geometry启用时，world将会失效
-        if config.geomtry:
+        if config.geometry:
             self.axisTransform = AXIS_FLIP_L * self.geometryTransform
             pass
         elif config.world:
@@ -501,7 +501,7 @@ class Mesh(object):
         self.invAxisTransform = FbxAMatrix(self.axisTransform)
         self.invAxisTransform = self.invAxisTransform.Inverse()
         # 启用geometry
-        if config.geomtry:
+        if config.geometry:
             self.transform = AXIS_FLIP_L * self.fbxMesh.GetNode().EvaluateGlobalTransform() * self.geometryTransform * self.invAxisTransform
             pass
         elif config.world:
