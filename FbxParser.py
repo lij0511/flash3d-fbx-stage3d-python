@@ -92,25 +92,14 @@ def parseArgument():
 
 # 扫描Fbx文件
 def scanFbxFiles(args):
-    sourceDir = None
-    # 获取路径
-    if len(args) == 0:
-        sourceDir = os.getcwd()
-        pass
-    else:
-        sourceDir = args[0]
-        if not os.path.exists(sourceDir):
-            sourceDir = os.getcwd()
-            pass
-        pass
     # 拼接fbx文件
     fbxList = []
-    if os.path.isfile(sourceDir):
-        fbxList.append(sourceDir)
+    if os.path.isfile(args):
+        fbxList.append(args)
         pass
     else:
-        logging.info("scane current directory:%s" % sourceDir)
-        for parentDir, _, fileNames in os.walk(sourceDir):
+        logging.info("scane current directory:%s" % os.getcwd())
+        for parentDir, _, fileNames in os.walk(os.getcwd()):
             for fileName in fileNames:
                 if fileName.endswith('FBX') or fileName.endswith('fbx'):
                     filePath = os.path.join(parentDir, fileName)
