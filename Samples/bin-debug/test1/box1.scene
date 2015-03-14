@@ -4,7 +4,7 @@
         {
             "anim": {
                 "name": "box1_Box001.anim", 
-                "totalFrames": 101
+                "totalFrames": 0
             }, 
             "name": "box1_Box001.mesh", 
             "skeleton": false, 

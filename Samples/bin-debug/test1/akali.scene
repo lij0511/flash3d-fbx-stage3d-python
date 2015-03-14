@@ -4,11 +4,11 @@
         {
             "anim": {
                 "name": "akali_transformAkali_nurse.anim", 
-                "totalFrames": 214
+                "totalFrames": 0
             }, 
             "name": "akali_transformAkali_nurse.mesh", 
-            "skeleton": true, 
-            "texture": "akali_nurse_TX_CM.dds", 
+            "skeleton": false, 
+            "texture": "", 
             "transform": [
                 1.0, 
                 0.0, 

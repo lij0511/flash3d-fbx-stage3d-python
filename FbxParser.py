@@ -1,3 +1,4 @@
+#!/usr/bin/python2.7
 # coding: utf-8
 
 ''' 
@@ -1578,7 +1579,7 @@ if __name__ == "__main__":
                         datefmt  = '%a, %d %b %Y %H:%M:%S',
                         filename = 'log.log',
                         filemode = 'w')
-    console = logging.StreamHandler()
+    console = logging.StreamHandler(sys.stdout)
     console.setLevel(logging.INFO)
     formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
     console.setFormatter(formatter)
