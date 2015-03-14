@@ -60,23 +60,23 @@ def parseArgument():
     
     parser = argparse.ArgumentParser()
     # 解析法线
-    parser.add_argument("-normal",  help = "parse normal",              action = "store_true",      default = True)
+    parser.add_argument("-normal",  help = "parse normal",              action = "store_true",      default = False)
     # 解析切线
-    parser.add_argument("-tangent", help = "parse tangent",             action = "store_true",      default = True)
+    parser.add_argument("-tangent", help = "parse tangent",             action = "store_true",      default = False)
     # 解析UV0
-    parser.add_argument("-uv0",     help = "parse uv0",                 action = "store_true",      default = True)
+    parser.add_argument("-uv0",     help = "parse uv0",                 action = "store_true",      default = False)
     # 解析UV1
-    parser.add_argument("-uv1",     help = "parse uv1",                 action = "store_true",      default = True)
+    parser.add_argument("-uv1",     help = "parse uv1",                 action = "store_true",      default = False)
     # 解析动画
-    parser.add_argument("-anim",    help = "parse animation",           action = "store_true",      default = True)
+    parser.add_argument("-anim",    help = "parse animation",           action = "store_true",      default = False)
     # 使用geometry坐标
-    parser.add_argument("-geomtry", help = "geometry transform",        action = "store_true",      default = True)
+    parser.add_argument("-geomtry", help = "geometry transform",        action = "store_true",      default = False)
     # 使用全局坐标
     parser.add_argument("-world",   help = "world Transofrm",           action = "store_true",      default = False)
     # 指定Fbx文件路径
     parser.add_argument("-path",    help = "fbx file path  ",           action = "store",           default = "")
     # 使用四元数方式
-    parser.add_argument("-quat",    help = "quat with anima",           action = "store_true",      default = True)
+    parser.add_argument("-quat",    help = "quat with anima",           action = "store_true",      default = False)
     # 使用四元数时，最大骨骼数
     parser.add_argument("-max_quat",help = "bone num with quat",        action = "store",           default = 56)
     # 使用矩阵时，最大骨骼数
