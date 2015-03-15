@@ -428,7 +428,10 @@ class Material(object):
             typeName = str(prop.GetName())
             for j in range(count):
                 texture = prop.GetSrcObject(FbxTexture.ClassId, j)
-                self.textures[typeName] = re.compile("[\\\/]").split(texture.GetFileName())[-1]
+                texName = re.compile("[\\\/]").split(texture.GetFileName())[-1]
+                texName = texName.replace(".dds", ".png")
+                texName = texName.replace(".tga", ".png")
+                self.textures[typeName] = texName
                 logging.info("\t%s -> %s" % (prop.GetName(), self.textures[typeName]))
                 pass
             pass
@@ -1498,7 +1501,7 @@ def getMeshConfig(mesh):
         anim["name"]        = animName
         anim["totalFrames"] = len(mesh.anims)
         pass
-    
+
     return obj
     pass # end func
 
