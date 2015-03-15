@@ -412,9 +412,9 @@ class Material(object):
     def __init__(self):
         super(Material, self).__init__()
         
-        self.material       = None  # 材质
-        self.name           = None  # 材质名称
-        self.textureName    = ""    # 贴图名称
+        self.material       = None      # 材质
+        self.name           = None      # 材质名称
+        self.textures       = {}        # 所有的贴图
         
         pass # end func
     
@@ -424,23 +424,16 @@ class Material(object):
         self.name     = self.material.GetName() 
         for i in range(FbxLayerElement.sTypeTextureCount()):
             prop = self.material.FindProperty(FbxLayerElement.sTextureChannelNames(i))
-            if prop.GetName() != "DiffuseColor":
-                continue;
-                pass
             count = prop.GetSrcObjectCount(FbxTexture.ClassId)
+            typeName = str(prop.GetName())
             for j in range(count):
                 texture = prop.GetSrcObject(FbxTexture.ClassId, j)
-#                 self.textureName = str(texture.GetFileName())
-                self.textureName = ""
+                self.textures[typeName] = re.compile("[\\\/]").split(texture.GetFileName())[-1]
+                logging.info("\t%s -> %s" % (prop.GetName(), self.textures[typeName]))
                 pass
             pass
-        # 解析文件名
-        if not self.textureName:
-            return
-        # 获取文件名
-        self.textureName = re.compile("[\\\/]").split(self.textureName)[-1]
         pass # end func
-    
+        
     pass
 
 # 模型
@@ -1397,13 +1390,12 @@ class Mesh(object):
             return
         self.material = Material()
         self.material.initWithFbxMaterial(self.fbxMesh.GetNode().GetMaterial(0))
-        logging.info("\ttexture:%s" % self.material.textureName)
         pass
     
     # 初始化mesh
     def initWithFbxMesh(self, fbxMesh, sdkManager, scene, fbxFilePath):
         
-        logging.info("parse mesh...")
+        logging.info("\tparse mesh...")
         
         self.fbxMesh    = fbxMesh
         self.sdkManager = sdkManager
@@ -1468,7 +1460,7 @@ def parseCameras(sdkManager, scene, filepath):
 
 # 解析所有的模型
 def parseMeshes(sdkManager, scene, filepath):
-    logging.info("parse meshes...")
+    logging.info("\tparse meshes...")
     count = scene.GetSrcObjectCount(FbxMesh.ClassId)
     logging.info("\tmesh num:%d" % (count))
     meshes = []
@@ -1483,10 +1475,8 @@ def parseMeshes(sdkManager, scene, filepath):
 
 # 获取模型配置
 def getMeshConfig(mesh):
-    
     meshName = re.compile("[\\\/]").split(mesh.meshFileName)[-1] 
     animName = re.compile("[\\\/]").split(mesh.animFileName)[-1]
-    
     obj = {}
     # 模型名称
     obj["name"]         = meshName
@@ -1495,15 +1485,20 @@ def getMeshConfig(mesh):
     # 坐标点
     obj["transform"]    = Matrix3D(mesh.transform).rawData
     # 材质名称
+    obj["textures"]     = {}
     if mesh.material:
-        obj["texture"]  = mesh.material.textureName
+        for texName in mesh.material.textures:
+            obj["textures"][texName] = mesh.material.textures[texName]
+            pass
         pass
     # 动画
-    anim                = {}
-    obj["anim"]         = anim
-    anim["name"]        = animName
-    # 动画帧数
-    anim["totalFrames"] = len(mesh.anims)
+    if config.anim:
+        anim = {}
+        obj["anim"] = anim
+        anim["name"]        = animName
+        anim["totalFrames"] = len(mesh.anims)
+        pass
+    
     return obj
     pass # end func
 
@@ -1594,4 +1589,6 @@ if __name__ == "__main__":
         parseFBX(item, config)
         pass
     
+    logging.info("ʕ•̫͡•ʕ*̫͡*ʕ")
+
     pass
