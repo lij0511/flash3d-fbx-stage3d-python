@@ -435,7 +435,7 @@ class Material(object):
                 texName = texName.replace(".dds", ".png")
                 texName = texName.replace(".tga", ".png")
                 self.textures[typeName].append(texName)
-                logging.info("\t%s -> %s" % (prop.GetName(), typeName))
+                logging.info("\t%s -> %s" % (prop.GetName(), texName))
                 pass
             pass
         pass # end func
