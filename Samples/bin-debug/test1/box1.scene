@@ -2,12 +2,9 @@
     "cameras": [], 
     "meshes": [
         {
-            "anim": {
-                "name": "box1_Box001.anim", 
-                "totalFrames": 0
-            }, 
             "name": "box1_Box001.mesh", 
             "skeleton": false, 
+            "textures": {}, 
             "transform": [
                 1.0, 
                 0.0, 

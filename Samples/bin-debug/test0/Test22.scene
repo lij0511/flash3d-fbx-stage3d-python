@@ -4,12 +4,9 @@
     ], 
     "meshes": [
         {
-            "anim": {
-                "name": "Test22_Plane001.anim", 
-                "totalFrames": 0
-            }, 
             "name": "Test22_Plane001.mesh", 
             "skeleton": false, 
+            "textures": {}, 
             "transform": [
                 1.0, 
                 0.0, 
@@ -30,12 +27,9 @@
             ]
         }, 
         {
-            "anim": {
-                "name": "Test22_Box001.anim", 
-                "totalFrames": 0
-            }, 
             "name": "Test22_Box001.mesh", 
             "skeleton": false, 
+            "textures": {}, 
             "transform": [
                 1.0, 
                 0.0, 
@@ -56,12 +50,9 @@
             ]
         }, 
         {
-            "anim": {
-                "name": "Test22_Sphere001.anim", 
-                "totalFrames": 0
-            }, 
             "name": "Test22_Sphere001.mesh", 
             "skeleton": false, 
+            "textures": {}, 
             "transform": [
                 1.0, 
                 -1.5948940325902932e-40, 
@@ -82,12 +73,9 @@
             ]
         }, 
         {
-            "anim": {
-                "name": "Test22_Cone001.anim", 
-                "totalFrames": 0
-            }, 
             "name": "Test22_Cone001.mesh", 
             "skeleton": false, 
+            "textures": {}, 
             "transform": [
                 1.0, 
                 0.0, 
@@ -108,12 +96,9 @@
             ]
         }, 
         {
-            "anim": {
-                "name": "Test22_Box002.anim", 
-                "totalFrames": 0
-            }, 
             "name": "Test22_Box002.mesh", 
             "skeleton": false, 
+            "textures": {}, 
             "transform": [
                 1.0, 
                 0.0, 
