@@ -32,6 +32,7 @@ import re
 import struct
 import sys
 import zlib
+import lzma
 
 # object
 class LObject(object):
@@ -81,7 +82,9 @@ def parseArgument():
     # 使用矩阵时，最大骨骼数
     parser.add_argument("-max_m34", help = "bone num with m34",         action = "store",           default = 36)
     # 挂节点
-    parser.add_argument("-mount",  help = "mount bone, split by ','",   action = "store",  default = "Bone001")
+    parser.add_argument("-mount",  help = "mount bone, split by ','",   action = "store",           default = "Bone001")
+    # 压缩方式
+    parser.add_argument("-lzma",  help = "compress by lzma",            action = "store_true",      default = False)
     
     option = parser.parse_args()
     option.mount = option.mount.split(",")
@@ -1054,15 +1057,28 @@ class Mesh(object):
                 weIdx = subMesh.weightsAndIndices[i]
                 data += struct.pack('<ffff', weIdx[4] * step, weIdx[5] * step, weIdx[6] * step, weIdx[7] * step)
                 pass
+            # 写索引数据,占坑
+            struct.pack('<i', 0)
             
             pass # end for
         
         # 写包围盒数据
         data += struct.pack('<ffffff', self.bounds.min[0], self.bounds.min[1], self.bounds.min[2], self.bounds.max[0], self.bounds.max[1], self.bounds.max[2])
+        # 写压缩格式
+        ret = None
+        if config.lzma:
+            ret = struct.pack('<i', 2)
+        else:
+            ret = struct.pack('<i', 1)
+        # 写压缩前数据长度
+        ret += struct.pack('<i', len(data))
         # 压缩
-        data = zlib.compress(data, 9)
-        
-        self.meshBytes = data
+        if config.lama:
+            data = lzma.compress(data)
+        else:
+            data = zlib.compress(data, 9)
+        ret += data
+        self.meshBytes = ret
         pass # end func
     
     # 生成帧动画数据
@@ -1154,8 +1170,21 @@ class Mesh(object):
         else:
             data = self.generateFrameAnimBytes()
             pass
-        data = zlib.compress(data, 9)
-        self.animBytes = data
+        # 写压缩格式
+        ret = None
+        if config.lzma:
+            ret = struct.pack('<i', 2)
+        else:
+            ret = struct.pack('<i', 1)
+        # 写压缩前数据长度
+        ret += struct.pack('<i', len(data))
+        # 压缩
+        if config.lama:
+            data = lzma.compress(data)
+        else:
+            data = zlib.compress(data, 9)
+        ret += data
+        self.animBytes = ret
         pass # end func
     
     # 拆分模型
