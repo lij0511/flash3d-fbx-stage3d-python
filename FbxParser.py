@@ -23,7 +23,6 @@ FBX:
 
 from FbxCommon import *
 from platform import system
-from string import count
 import argparse
 import json
 import logging
@@ -32,7 +31,6 @@ import re
 import struct
 import sys
 import zlib
-import lzma
 
 # object
 class LObject(object):
@@ -1058,7 +1056,7 @@ class Mesh(object):
                 data += struct.pack('<ffff', weIdx[4] * step, weIdx[5] * step, weIdx[6] * step, weIdx[7] * step)
                 pass
             # 写索引数据,占坑
-            struct.pack('<i', 0)
+            data += struct.pack('<i', 0)
             
             pass # end for
         
@@ -1073,7 +1071,7 @@ class Mesh(object):
         # 写压缩前数据长度
         ret += struct.pack('<i', len(data))
         # 压缩
-        if config.lama:
+        if config.lzma:
             data = lzma.compress(data)
         else:
             data = zlib.compress(data, 9)
@@ -1179,7 +1177,7 @@ class Mesh(object):
         # 写压缩前数据长度
         ret += struct.pack('<i', len(data))
         # 压缩
-        if config.lama:
+        if config.lzma:
             data = lzma.compress(data)
         else:
             data = zlib.compress(data, 9)
